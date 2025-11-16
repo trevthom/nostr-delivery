@@ -370,13 +370,25 @@ export default function DeliveryApp() {
       // Load all deliveries - we'll filter in the UI
       const requests = await api.getDeliveries();
       setDeliveryRequests(requests);
-      
+
       // Find active delivery for courier - delivery they accepted
-      const active = requests.find(r => 
+      const active = requests.find(r =>
         (r.status === 'accepted' || r.status === 'intransit' || r.status === 'completed') &&
         r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)
       );
       setActiveDelivery(active || null);
+
+      // Refresh user profile to get updated stats (reputation and completed deliveries)
+      if (userProfile.npub) {
+        try {
+          const updatedProfile = await api.getUser(userProfile.npub);
+          setUserProfile({ ...updatedProfile, npub: userProfile.npub, verified_identity: userProfile.verified_identity });
+        } catch (profileErr) {
+          console.error('Failed to refresh user profile:', profileErr);
+          // Don't set error state for profile refresh failures
+        }
+      }
+
       setError(null);
     } catch (err) {
       setError('Failed to load deliveries');
@@ -1035,12 +1047,15 @@ export default function DeliveryApp() {
                   : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Confirmed Deliveries
+              Completed Deliveries
             </button>
           )}
           {userMode === UserMode.COURIER && (
             <button
-              onClick={() => setCurrentView('completed')}
+              onClick={() => {
+                setCurrentView('completed');
+                setHasViewedCompletedDeliveries(true);
+              }}
               className={`px-6 py-3 font-medium transition-colors ${
                 currentView === 'completed'
                   ? 'border-b-2 border-orange-500 text-orange-600'
@@ -1275,23 +1290,35 @@ export default function DeliveryApp() {
                   </div>
 
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => placeBid(request.id, request.offer_amount)}
-                      disabled={loading}
-                      className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors"
-                    >
-                      Accept {request.offer_amount.toLocaleString()} sats
-                    </button>
-                    <button
-                      onClick={() => {
-                        const counterOffer = prompt('Enter your counter-offer (sats):');
-                        if (counterOffer) placeBid(request.id, parseInt(counterOffer));
-                      }}
-                      disabled={loading}
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors"
-                    >
-                      Counter Offer
-                    </button>
+                    {(() => {
+                      const existingBid = request.bids.find(b => b.courier === userProfile.npub);
+                      const hasBid = !!existingBid;
+
+                      return (
+                        <>
+                          <button
+                            onClick={() => !hasBid && placeBid(request.id, request.offer_amount)}
+                            disabled={loading || hasBid}
+                            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
+                          >
+                            {hasBid
+                              ? `Bid Sent for ${existingBid.amount.toLocaleString()} sats`
+                              : `Accept ${request.offer_amount.toLocaleString()} sats`
+                            }
+                          </button>
+                          <button
+                            onClick={() => {
+                              const counterOffer = prompt('Enter your counter-offer (sats):');
+                              if (counterOffer) placeBid(request.id, parseInt(counterOffer));
+                            }}
+                            disabled={loading}
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors"
+                          >
+                            Counter Offer
+                          </button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               ))
@@ -1547,7 +1574,7 @@ export default function DeliveryApp() {
                       </button>
                     )}
                     <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium`}>
-                      {activeDelivery.status === 'completed' ? '(pending completion)' : activeDelivery.status}
+                      {activeDelivery.status === 'completed' ? '(pending completion)' : activeDelivery.status === 'accepted' ? 'in progress' : activeDelivery.status}
                     </span>
                   </div>
                 </div>
@@ -1737,7 +1764,7 @@ export default function DeliveryApp() {
         {/* CONFIRMED DELIVERIES VIEW (SENDER) */}
         {currentView === 'confirmed' && userMode === UserMode.SENDER && (
           <div>
-            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Confirmed Deliveries</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Deliveries</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
@@ -1745,7 +1772,7 @@ export default function DeliveryApp() {
             ) : deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'confirmed').length === 0 ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <CheckCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No confirmed deliveries yet.</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No completed deliveries yet.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1757,10 +1784,10 @@ export default function DeliveryApp() {
                   return (
                     <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsedDeliveries(prev => ({ ...prev, [delivery.id]: !isCollapsed }))}>
-                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Confirmed Delivery</h3>
+                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
                         <div className="flex items-center gap-2">
                           <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                            ✅ Confirmed
+                            ✅ Completed
                           </span>
                           {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                         </div>
@@ -1921,7 +1948,7 @@ export default function DeliveryApp() {
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
                         <div className="flex items-center gap-2">
                           <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                            ✅ Confirmed
+                            ✅ Completed
                           </span>
                           {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                         </div>
