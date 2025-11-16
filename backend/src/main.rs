@@ -63,6 +63,8 @@ impl AppState {
             distance_meters: Some(125000.0), // ~78 miles
             proof_of_delivery: None,
             sender_feedback: None,
+            sender_rating: None,
+            completed_at: None,
         };
         deliveries.insert(demo_delivery.id.clone(), demo_delivery);
         
@@ -156,7 +158,7 @@ async fn create_delivery(
         offer_amount: req.offer_amount,
         insurance_amount: req.insurance_amount,
         time_window: req.time_window.clone(),
-        expires_at: Some(Utc::now().timestamp() + 86400),
+        expires_at: Some(Utc::now().timestamp() + 604800), // 1 week
         status: DeliveryStatus::Open,
         bids: vec![],
         accepted_bid: None,
@@ -164,6 +166,8 @@ async fn create_delivery(
         distance_meters: distance,
         proof_of_delivery: None,
         sender_feedback: None,
+        sender_rating: None,
+        completed_at: None,
     };
     
     data.deliveries.lock().unwrap().insert(id.clone(), delivery.clone());
@@ -299,6 +303,7 @@ async fn confirm_delivery(
     if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
         delivery.status = DeliveryStatus::Confirmed;
         delivery.sender_feedback = req.feedback.clone();
+        delivery.sender_rating = req.rating;
 
         // Update courier reputation
         if let Some(accepted_bid_id) = &delivery.accepted_bid {
@@ -308,7 +313,12 @@ async fn confirm_delivery(
                     courier.total_earnings += delivery.offer_amount;
 
                     if let Some(rating) = req.rating {
-                        courier.reputation = calculate_new_reputation(courier.reputation, rating);
+                        let new_rep = if courier.completed_deliveries == 0 {
+                            rating
+                        } else {
+                            ((courier.reputation * (courier.completed_deliveries - 1) as f32) + rating) / courier.completed_deliveries as f32
+                        };
+                        courier.reputation = new_rep;
                     }
                 }
             }
@@ -448,6 +458,7 @@ async fn cancel_delivery(
 struct CompleteDeliveryRequest {
     images: Vec<String>,
     signature_name: Option<String>,
+    comments: Option<String>,
 }
 
 async fn complete_delivery(
@@ -477,8 +488,10 @@ async fn complete_delivery(
             signature_name: req.signature_name.clone(),
             timestamp: Utc::now().timestamp(),
             location: None,
+            comments: req.comments.clone(),
         });
         delivery.status = DeliveryStatus::Completed;
+        delivery.completed_at = Some(Utc::now().timestamp());
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "status": "completed",

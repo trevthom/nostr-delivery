@@ -42,6 +42,7 @@ pub struct ProofOfDelivery {
     pub signature_name: Option<String>,
     pub timestamp: i64,
     pub location: Option<GeoPoint>,
+    pub comments: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,6 +63,8 @@ pub struct DeliveryRequest {
     pub distance_meters: Option<f64>,
     pub proof_of_delivery: Option<ProofOfDelivery>,
     pub sender_feedback: Option<String>,
+    pub sender_rating: Option<f32>,
+    pub completed_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

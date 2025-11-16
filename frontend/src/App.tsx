@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, MapPin, Clock, Shield, Bitcoin, CheckCircle, XCircle, AlertCircle, Settings, LogOut, User, TrendingUp, Key } from 'lucide-react';
+import { Package, MapPin, Clock, Shield, Bitcoin, CheckCircle, XCircle, AlertCircle, Settings, LogOut, User, TrendingUp, Key, ChevronDown, ChevronUp, Bell } from 'lucide-react';
 import { isValidNsec, nsecToNpub, formatNpubForDisplay } from './lib/crypto';
 
 // ============================================================================
@@ -33,6 +33,7 @@ interface ProofOfDelivery {
   signature_name?: string;
   timestamp: number;
   location?: { lat: number; lng: number };
+  comments?: string;
 }
 
 interface DeliveryRequest {
@@ -52,6 +53,8 @@ interface DeliveryRequest {
   distance_meters?: number;
   proof_of_delivery?: ProofOfDelivery;
   sender_feedback?: string;
+  sender_rating?: number;
+  completed_at?: number;
 }
 
 interface DeliveryBid {
@@ -204,9 +207,13 @@ export default function DeliveryApp() {
   // Delivery Completion State
   const [proofImages, setProofImages] = useState<string[]>([]);
   const [signatureName, setSignatureName] = useState('');
+  const [deliveryComments, setDeliveryComments] = useState('');
   const [showCompletionForm, setShowCompletionForm] = useState(false);
   const [senderFeedback, setSenderFeedback] = useState('');
   const [selectedRating, setSelectedRating] = useState(0);
+
+  // Collapsible state
+  const [collapsedDeliveries, setCollapsedDeliveries] = useState<Record<string, boolean>>({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -549,6 +556,9 @@ export default function DeliveryApp() {
       setSenderFeedback('');
       setSelectedRating(0);
       await loadDeliveryRequests();
+      // Refresh user profile to get updated stats
+      const updatedProfile = await api.getUser(userProfile.npub);
+      setUserProfile({ ...updatedProfile, npub: userProfile.npub });
       setError(null);
     } catch (err) {
       setError('Failed to confirm delivery');
@@ -587,7 +597,8 @@ export default function DeliveryApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           images: proofImages,
-          signature_name: signatureName.trim() || undefined
+          signature_name: signatureName.trim() || undefined,
+          comments: deliveryComments.trim() || undefined
         })
       });
 
@@ -596,6 +607,7 @@ export default function DeliveryApp() {
       alert('âœ… Delivery marked as completed! Awaiting sender confirmation.');
       setProofImages([]);
       setSignatureName('');
+      setDeliveryComments('');
       setShowCompletionForm(false);
       await loadDeliveryRequests();
       setError(null);
@@ -798,18 +810,19 @@ export default function DeliveryApp() {
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-purple-50'}`}>
       {/* Header */}
       <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Package className="w-8 h-8 text-orange-500" />
-            <div>
-              <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nostr Delivery</h1>
-              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {authType === 'nsec' ? formatNpubForDisplay(userProfile.npub) : 'Demo Mode'}
-              </p>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-orange-500" />
+              <div>
+                <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nostr Delivery</h1>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {authType === 'nsec' ? formatNpubForDisplay(userProfile.npub) : 'Demo Mode'}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4">
             <select
               value={userMode}
               onChange={(e) => {
@@ -835,6 +848,43 @@ export default function DeliveryApp() {
             >
               <LogOut className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
             </button>
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="flex justify-center mt-2">
+            {userMode === UserMode.SENDER && (
+              <>
+                {deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open').length > 0 && (
+                  <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
+                    <Bell className="w-4 h-4" />
+                    <span>{deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open').length} new bid(s)</span>
+                  </div>
+                )}
+                {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'completed').length > 0 && (
+                  <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'} rounded-full text-sm`}>
+                    <Bell className="w-4 h-4" />
+                    <span>{deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'completed').length} delivery(ies) completed</span>
+                  </div>
+                )}
+              </>
+            )}
+            {userMode === UserMode.COURIER && (
+              <>
+                {deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                  <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'} rounded-full text-sm`}>
+                    <Bell className="w-4 h-4" />
+                    <span>{deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} bid(s) accepted</span>
+                  </div>
+                )}
+                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                  <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
+                    <Bell className="w-4 h-4" />
+                    <span>{deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} delivery(ies) confirmed</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -887,7 +937,7 @@ export default function DeliveryApp() {
                 </p>
               </div>
               <div className={`p-4 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
-                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Completed</p>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Deliveries Completed</p>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
                   {userProfile.completed_deliveries}
                 </p>
@@ -1246,6 +1296,30 @@ export default function DeliveryApp() {
                         </span>
                       </div>
 
+                      {/* Auto-delete Warning */}
+                      {request.status === 'open' && request.expires_at && (
+                        (() => {
+                          const now = Math.floor(Date.now() / 1000);
+                          const timeLeft = request.expires_at - now;
+                          const daysLeft = Math.floor(timeLeft / 86400);
+                          const hoursLeft = Math.floor((timeLeft % 86400) / 3600);
+
+                          if (timeLeft > 0 && timeLeft < 604800) {
+                            return (
+                              <div className={`mb-4 p-3 ${daysLeft < 2 ? (darkMode ? 'bg-red-900 border-red-700' : 'bg-red-50 border-red-200') : (darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200')} border rounded-lg`}>
+                                <p className={`text-sm font-medium ${daysLeft < 2 ? (darkMode ? 'text-red-200' : 'text-red-700') : (darkMode ? 'text-yellow-200' : 'text-yellow-700')}`}>
+                                  âš  Auto-delete in {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`}
+                                </p>
+                                <p className={`text-xs mt-1 ${daysLeft < 2 ? (darkMode ? 'text-red-300' : 'text-red-600') : (darkMode ? 'text-yellow-300' : 'text-yellow-600')}`}>
+                                  This delivery will be automatically deleted if not started. Save details if you need to resubmit.
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()
+                      )}
+
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
                         <div>
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup</p>
@@ -1546,6 +1620,20 @@ export default function DeliveryApp() {
                         </div>
                       )}
 
+                      {/* Delivery Comments */}
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                          Comments (Optional)
+                        </label>
+                        <textarea
+                          value={deliveryComments}
+                          onChange={(e) => setDeliveryComments(e.target.value)}
+                          placeholder="Add any notes or comments about the delivery..."
+                          rows={3}
+                          className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
+                        />
+                      </div>
+
                       {/* Action Buttons */}
                       <div className="flex gap-3">
                         <button
@@ -1553,6 +1641,7 @@ export default function DeliveryApp() {
                             setShowCompletionForm(false);
                             setProofImages([]);
                             setSignatureName('');
+                            setDeliveryComments('');
                           }}
                           className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${darkMode ? 'text-white' : 'text-gray-900'} font-medium py-3 rounded-lg transition-colors`}
                         >
@@ -1596,26 +1685,70 @@ export default function DeliveryApp() {
               <div className="space-y-4">
                 {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'confirmed').map(delivery => {
                   const courierBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+                  const isCollapsed = collapsedDeliveries[delivery.id] !== false;
+                  const completedDate = delivery.completed_at ? new Date(delivery.completed_at * 1000) : null;
+
                   return (
                     <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsedDeliveries(prev => ({ ...prev, [delivery.id]: !isCollapsed }))}>
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Confirmed Delivery</h3>
-                        <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                          ✅ Confirmed
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
+                            ✅ Confirmed
+                          </span>
+                          {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                        </div>
                       </div>
 
-                      {/* Delivery Details */}
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
-                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                      {/* Collapsed Summary View */}
+                      {isCollapsed ? (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                          </div>
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
+                          </div>
+                          {completedDate && (
+                            <>
+                              <div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div>
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
-                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
-                        </div>
-                      </div>
+                      ) : (
+                        <>
+                          {/* Delivery Details */}
+                          <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                            </div>
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
+                            </div>
+                            {completedDate && (
+                              <>
+                                <div>
+                                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                </div>
+                                <div>
+                                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                </div>
+                              </>
+                            )}
+                          </div>
 
                       {/* Package Info */}
                       <div className="mb-4">
@@ -1649,8 +1782,13 @@ export default function DeliveryApp() {
                               <strong>Received by:</strong> {delivery.proof_of_delivery.signature_name}
                             </p>
                           )}
+                          {delivery.proof_of_delivery.comments && (
+                            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <strong>Comments:</strong> {delivery.proof_of_delivery.comments}
+                            </p>
+                          )}
                           {delivery.proof_of_delivery.images.length > 0 && (
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-4 gap-2 mt-2">
                               {delivery.proof_of_delivery.images.map((img, idx) => (
                                 <img
                                   key={idx}
@@ -1675,13 +1813,15 @@ export default function DeliveryApp() {
                         </div>
                       )}
 
-                      {/* Payment Info */}
-                      <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
-                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Payment Released</p>
-                        <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                          {delivery.offer_amount.toLocaleString()} sats
-                        </p>
-                      </div>
+                          {/* Payment Info */}
+                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Payment Released</p>
+                            <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                              {delivery.offer_amount.toLocaleString()} sats
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -1705,26 +1845,85 @@ export default function DeliveryApp() {
               </div>
             ) : (
               <div className="space-y-4">
-                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).map(delivery => (
-                  <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
-                      <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                        ✅ Confirmed
-                      </span>
-                    </div>
+                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).map(delivery => {
+                  const isCollapsed = collapsedDeliveries[delivery.id] !== false;
+                  const completedDate = delivery.completed_at ? new Date(delivery.completed_at * 1000) : null;
 
-                    {/* Delivery Details */}
-                    <div className="grid md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                  return (
+                    <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+                      <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsedDeliveries(prev => ({ ...prev, [delivery.id]: !isCollapsed }))}>
+                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
+                            ✅ Confirmed
+                          </span>
+                          {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                        </div>
                       </div>
-                      <div>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
-                      </div>
-                    </div>
+
+                      {/* Collapsed Summary View */}
+                      {isCollapsed ? (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                          </div>
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
+                          </div>
+                          {completedDate && (
+                            <>
+                              <div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                              </div>
+                            </>
+                          )}
+                          {delivery.sender_rating && (
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Your Rating</p>
+                              <p className={`font-medium text-yellow-500 text-lg`}>{'⭐'.repeat(Math.round(delivery.sender_rating))} ({delivery.sender_rating.toFixed(1)})</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {/* Delivery Details */}
+                          <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.pickup.address}</p>
+                            </div>
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
+                            </div>
+                            {completedDate && (
+                              <>
+                                <div>
+                                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                </div>
+                                <div>
+                                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Star Rating */}
+                          {delivery.sender_rating && (
+                            <div className={`mb-4 p-3 ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'} rounded-lg`}>
+                              <h4 className={`font-semibold mb-2 ${darkMode ? 'text-yellow-300' : 'text-yellow-900'}`}>Your Rating</h4>
+                              <p className="text-yellow-500 text-2xl">{'⭐'.repeat(Math.round(delivery.sender_rating))} <span className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>({delivery.sender_rating.toFixed(1)} stars)</span></p>
+                            </div>
+                          )}
 
                     {/* Package Info */}
                     <div className="mb-4">
@@ -1738,48 +1937,56 @@ export default function DeliveryApp() {
                       </div>
                     </div>
 
-                    {/* Proof of Delivery */}
-                    {delivery.proof_of_delivery && (
-                      <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                        <h4 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Your Proof of Delivery</h4>
-                        {delivery.proof_of_delivery.signature_name && (
-                          <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            <strong>Received by:</strong> {delivery.proof_of_delivery.signature_name}
-                          </p>
-                        )}
-                        {delivery.proof_of_delivery.images.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2">
-                            {delivery.proof_of_delivery.images.map((img, idx) => (
-                              <img
-                                key={idx}
-                                src={img}
-                                alt={`Proof ${idx + 1}`}
-                                className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                                onClick={() => window.open(img, '_blank')}
-                              />
-                            ))}
+                          {/* Proof of Delivery */}
+                          {delivery.proof_of_delivery && (
+                            <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                              <h4 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Your Proof of Delivery</h4>
+                              {delivery.proof_of_delivery.signature_name && (
+                                <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  <strong>Received by:</strong> {delivery.proof_of_delivery.signature_name}
+                                </p>
+                              )}
+                              {delivery.proof_of_delivery.comments && (
+                                <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  <strong>Comments:</strong> {delivery.proof_of_delivery.comments}
+                                </p>
+                              )}
+                              {delivery.proof_of_delivery.images.length > 0 && (
+                                <div className="grid grid-cols-4 gap-2 mt-2">
+                                  {delivery.proof_of_delivery.images.map((img, idx) => (
+                                    <img
+                                      key={idx}
+                                      src={img}
+                                      alt={`Proof ${idx + 1}`}
+                                      className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                                      onClick={() => window.open(img, '_blank')}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Sender Feedback */}
+                          {delivery.sender_feedback && (
+                            <div className={`mb-4 p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                              <h4 className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>Sender Feedback</h4>
+                              <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>{delivery.sender_feedback}</p>
+                            </div>
+                          )}
+
+                          {/* Earnings Info */}
+                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Earnings</p>
+                            <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                              {delivery.offer_amount.toLocaleString()} sats
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Sender Feedback */}
-                    {delivery.sender_feedback && (
-                      <div className={`mb-4 p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
-                        <h4 className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>Sender Feedback</h4>
-                        <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>{delivery.sender_feedback}</p>
-                      </div>
-                    )}
-
-                    {/* Earnings Info */}
-                    <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Earnings</p>
-                      <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                        {delivery.offer_amount.toLocaleString()} sats
-                      </p>
+                        </>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
