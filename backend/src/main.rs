@@ -62,6 +62,7 @@ impl AppState {
             created_at: Utc::now().timestamp(),
             distance_meters: Some(125000.0), // ~78 miles
             proof_of_delivery: None,
+            sender_feedback: None,
         };
         deliveries.insert(demo_delivery.id.clone(), demo_delivery);
         
@@ -162,6 +163,7 @@ async fn create_delivery(
         created_at: Utc::now().timestamp(),
         distance_meters: distance,
         proof_of_delivery: None,
+        sender_feedback: None,
     };
     
     data.deliveries.lock().unwrap().insert(id.clone(), delivery.clone());
@@ -283,6 +285,7 @@ async fn update_delivery_status(
 #[derive(Deserialize)]
 struct ConfirmDeliveryRequest {
     rating: Option<f32>,
+    feedback: Option<String>,
 }
 
 async fn confirm_delivery(
@@ -292,24 +295,25 @@ async fn confirm_delivery(
 ) -> Result<HttpResponse, Error> {
     let mut deliveries = data.deliveries.lock().unwrap();
     let mut users = data.users.lock().unwrap();
-    
+
     if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
         delivery.status = DeliveryStatus::Confirmed;
-        
+        delivery.sender_feedback = req.feedback.clone();
+
         // Update courier reputation
         if let Some(accepted_bid_id) = &delivery.accepted_bid {
             if let Some(bid) = delivery.bids.iter().find(|b| &b.id == accepted_bid_id) {
                 if let Some(courier) = users.get_mut(&bid.courier) {
                     courier.completed_deliveries += 1;
                     courier.total_earnings += delivery.offer_amount;
-                    
+
                     if let Some(rating) = req.rating {
                         courier.reputation = calculate_new_reputation(courier.reputation, rating);
                     }
                 }
             }
         }
-        
+
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "status": "confirmed",
             "delivery": delivery.clone()
