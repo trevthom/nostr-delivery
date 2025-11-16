@@ -319,6 +319,126 @@ async fn confirm_delivery(
     }
 }
 
+#[derive(Deserialize)]
+struct UpdateDeliveryRequest {
+    pickup: Option<Location>,
+    dropoff: Option<Location>,
+    packages: Option<Vec<PackageInfo>>,
+    offer_amount: Option<u64>,
+    insurance_amount: Option<u64>,
+    time_window: Option<String>,
+}
+
+async fn update_delivery(
+    data: web::Data<AppState>,
+    delivery_id: web::Path<String>,
+    req: web::Json<UpdateDeliveryRequest>,
+) -> Result<HttpResponse, Error> {
+    let mut deliveries = data.deliveries.lock().unwrap();
+    
+    if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
+        if delivery.status != DeliveryStatus::Open {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Cannot update delivery that is not open"
+            })));
+        }
+
+        if let Some(pickup) = req.pickup.clone() {
+            delivery.pickup = pickup;
+        }
+        if let Some(dropoff) = req.dropoff.clone() {
+            delivery.dropoff = dropoff;
+        }
+        if let Some(packages) = req.packages.clone() {
+            delivery.packages = packages;
+        }
+        if let Some(offer_amount) = req.offer_amount {
+            delivery.offer_amount = offer_amount;
+        }
+        if let Some(insurance_amount) = req.insurance_amount {
+            delivery.insurance_amount = Some(insurance_amount);
+        }
+        if let Some(time_window) = req.time_window.clone() {
+            delivery.time_window = time_window;
+        }
+
+        if let (Some(p1), Some(p2)) = (&delivery.pickup.coordinates, &delivery.dropoff.coordinates) {
+            delivery.distance_meters = Some(calculate_distance(p1, p2));
+        }
+
+        Ok(HttpResponse::Ok().json(serde_json::json!({
+            "status": "updated",
+            "delivery": delivery.clone()
+        })))
+    } else {
+        Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Delivery not found"
+        })))
+    }
+}
+
+async fn delete_delivery(
+    data: web::Data<AppState>,
+    delivery_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let mut deliveries = data.deliveries.lock().unwrap();
+    
+    if let Some(delivery) = deliveries.get(delivery_id.as_str()) {
+        if delivery.status != DeliveryStatus::Open {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Cannot delete delivery that is not open"
+            })));
+        }
+
+        deliveries.remove(delivery_id.as_str());
+        
+        Ok(HttpResponse::Ok().json(serde_json::json!({
+            "status": "deleted",
+            "id": delivery_id.as_str()
+        })))
+    } else {
+        Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Delivery not found"
+        })))
+    }
+}
+
+async fn cancel_delivery(
+    data: web::Data<AppState>,
+    delivery_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let mut deliveries = data.deliveries.lock().unwrap();
+    let mut users = data.users.lock().unwrap();
+    
+    if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
+        if delivery.status != DeliveryStatus::Accepted && delivery.status != DeliveryStatus::InTransit {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Can only cancel accepted deliveries"
+            })));
+        }
+
+        if let Some(accepted_bid_id) = &delivery.accepted_bid {
+            if let Some(bid) = delivery.bids.iter().find(|b| &b.id == accepted_bid_id) {
+                if let Some(courier) = users.get_mut(&bid.courier) {
+                    courier.total_earnings += delivery.offer_amount;
+                }
+            }
+        }
+
+        deliveries.remove(delivery_id.as_str());
+        
+        Ok(HttpResponse::Ok().json(serde_json::json!({
+            "status": "cancelled",
+            "message": "Delivery cancelled and sats forfeited to courier"
+        })))
+    } else {
+        Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Delivery not found"
+        })))
+    }
+}
+
+
 async fn get_user(
     data: web::Data<AppState>,
     npub: web::Path<String>,
@@ -367,13 +487,13 @@ async fn update_user(
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
     
-    println!("🚀 Nostr Delivery Backend Starting...");
-    println!("📍 Server will run on http://0.0.0.0:8080");
+    println!("ðŸš€ Nostr Delivery Backend Starting...");
+    println!("ðŸ“ Server will run on http://0.0.0.0:8080");
     
     let app_state = web::Data::new(AppState::new());
     
-    println!("✅ Demo data loaded");
-    println!("🌐 Server ready!");
+    println!("âœ… Demo data loaded");
+    println!("ðŸŒ Server ready!");
     
     HttpServer::new(move || {
         let cors = Cors::permissive();
@@ -386,9 +506,12 @@ async fn main() -> std::io::Result<()> {
             .route("/api/deliveries", web::get().to(get_deliveries))
             .route("/api/deliveries", web::post().to(create_delivery))
             .route("/api/deliveries/{id}", web::get().to(get_delivery))
+            .route("/api/deliveries/{id}", web::patch().to(update_delivery))
+            .route("/api/deliveries/{id}", web::delete().to(delete_delivery))
             .route("/api/deliveries/{id}/bid", web::post().to(place_bid))
             .route("/api/deliveries/{id}/accept/{bid_idx}", web::post().to(accept_bid))
             .route("/api/deliveries/{id}/status", web::patch().to(update_delivery_status))
+            .route("/api/deliveries/{id}/cancel", web::post().to(cancel_delivery))
             .route("/api/deliveries/{id}/confirm", web::post().to(confirm_delivery))
             .route("/api/user/{npub}", web::get().to(get_user))
             .route("/api/user/{npub}", web::patch().to(update_user))
