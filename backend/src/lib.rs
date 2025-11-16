@@ -92,7 +92,7 @@ impl Default for UserProfile {
         Self {
             npub: String::new(),
             display_name: None,
-            reputation: 4.5,
+            reputation: 0.0,
             completed_deliveries: 0,
             total_earnings: 0,
             verified_identity: false,
