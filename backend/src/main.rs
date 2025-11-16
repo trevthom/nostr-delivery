@@ -309,17 +309,18 @@ async fn confirm_delivery(
         if let Some(accepted_bid_id) = &delivery.accepted_bid {
             if let Some(bid) = delivery.bids.iter().find(|b| &b.id == accepted_bid_id) {
                 if let Some(courier) = users.get_mut(&bid.courier) {
-                    courier.completed_deliveries += 1;
-                    courier.total_earnings += delivery.offer_amount;
-
+                    // Calculate new reputation before incrementing completed_deliveries
                     if let Some(rating) = req.rating {
                         let new_rep = if courier.completed_deliveries == 0 {
                             rating
                         } else {
-                            ((courier.reputation * (courier.completed_deliveries - 1) as f32) + rating) / courier.completed_deliveries as f32
+                            ((courier.reputation * courier.completed_deliveries as f32) + rating) / (courier.completed_deliveries + 1) as f32
                         };
                         courier.reputation = new_rep;
                     }
+
+                    courier.completed_deliveries += 1;
+                    courier.total_earnings += delivery.offer_amount;
                 }
             }
         }

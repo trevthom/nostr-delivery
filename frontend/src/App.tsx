@@ -199,6 +199,7 @@ export default function DeliveryApp() {
   const [error, setError] = useState<string | null>(null);
   const [editingDelivery, setEditingDelivery] = useState<DeliveryRequest | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [hasViewedCompletedDeliveries, setHasViewedCompletedDeliveries] = useState(false);
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -246,6 +247,27 @@ export default function DeliveryApp() {
       loadDeliveryRequests();
     }
   }, [isAuthenticated, userMode, backendConnected]);
+
+  // Mark completed deliveries as viewed when courier views the completed tab
+  useEffect(() => {
+    if (currentView === 'completed' && userMode === UserMode.COURIER) {
+      setHasViewedCompletedDeliveries(true);
+    }
+  }, [currentView, userMode]);
+
+  // Reset viewed flag when courier has new confirmed deliveries
+  useEffect(() => {
+    if (userMode === UserMode.COURIER) {
+      const confirmedCount = deliveryRequests.filter(
+        r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)
+      ).length;
+
+      // Reset flag when there are new confirmed deliveries and user is not currently viewing them
+      if (confirmedCount > 0 && currentView !== 'completed' && hasViewedCompletedDeliveries) {
+        setHasViewedCompletedDeliveries(false);
+      }
+    }
+  }, [deliveryRequests, userMode, userProfile.npub, currentView, hasViewedCompletedDeliveries]);
 
   // ============================================================================
   // CONNECTION HANDLERS
@@ -877,10 +899,10 @@ export default function DeliveryApp() {
                     <span>{deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} bid(s) accepted</span>
                   </div>
                 )}
-                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                {!hasViewedCompletedDeliveries && deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
-                    <span>{deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} delivery(ies) confirmed</span>
+                    <span>Delivery Completed!</span>
                   </div>
                 )}
               </>
@@ -1274,15 +1296,15 @@ export default function DeliveryApp() {
                 <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
               </div>
             ) : userMode === UserMode.SENDER ? (
-              // Show sender's requests with bids
-              deliveryRequests.filter(r => r.sender === userProfile.npub).length === 0 ? (
+              // Show sender's requests with bids (excluding confirmed/completed)
+              deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed' && r.status !== 'completed').length === 0 ? (
                 <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                   <AlertCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
                   <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No requests yet. Create one to get started!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {deliveryRequests.filter(r => r.sender === userProfile.npub).map(request => (
+                  {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed' && r.status !== 'completed').map(request => (
                     <div key={request.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}` }>Delivery Request</h3>
