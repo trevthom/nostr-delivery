@@ -199,6 +199,7 @@ export default function DeliveryApp() {
   const [error, setError] = useState<string | null>(null);
   const [editingDelivery, setEditingDelivery] = useState<DeliveryRequest | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [hasViewedCompletedDeliveries, setHasViewedCompletedDeliveries] = useState(false);
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -214,6 +215,10 @@ export default function DeliveryApp() {
 
   // Collapsible state
   const [collapsedDeliveries, setCollapsedDeliveries] = useState<Record<string, boolean>>({});
+
+  // Bid/delivery seen tracking
+  const [seenBids, setSeenBids] = useState<Record<string, boolean>>({}); // deliveryId -> seen
+  const [seenActiveDeliveries, setSeenActiveDeliveries] = useState<Record<string, boolean>>({}); // deliveryId -> seen
 
   // Form State
   const [formData, setFormData] = useState({
@@ -246,6 +251,27 @@ export default function DeliveryApp() {
       loadDeliveryRequests();
     }
   }, [isAuthenticated, userMode, backendConnected]);
+
+  // Mark completed deliveries as viewed when courier views the completed tab
+  useEffect(() => {
+    if (currentView === 'completed' && userMode === UserMode.COURIER) {
+      setHasViewedCompletedDeliveries(true);
+    }
+  }, [currentView, userMode]);
+
+  // Reset viewed flag when courier has new confirmed deliveries
+  useEffect(() => {
+    if (userMode === UserMode.COURIER) {
+      const confirmedCount = deliveryRequests.filter(
+        r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)
+      ).length;
+
+      // Reset flag when there are new confirmed deliveries and user is not currently viewing them
+      if (confirmedCount > 0 && currentView !== 'completed' && hasViewedCompletedDeliveries) {
+        setHasViewedCompletedDeliveries(false);
+      }
+    }
+  }, [deliveryRequests, userMode, userProfile.npub, currentView, hasViewedCompletedDeliveries]);
 
   // ============================================================================
   // CONNECTION HANDLERS
@@ -429,6 +455,8 @@ export default function DeliveryApp() {
       setLoading(true);
       const result = await api.acceptBid(request.id, bidIndex);
       setActiveDelivery(result.delivery);
+      // Mark bid as seen when accepting
+      setSeenBids(prev => ({ ...prev, [request.id]: true }));
       alert('âœ… Bid accepted! Delivery in progress.');
       await loadDeliveryRequests();
       setCurrentView('active');
@@ -566,6 +594,14 @@ export default function DeliveryApp() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const markBidAsSeen = (deliveryId: string) => {
+    setSeenBids(prev => ({ ...prev, [deliveryId]: true }));
+  };
+
+  const markActiveDeliveryAsSeen = (deliveryId: string) => {
+    setSeenActiveDeliveries(prev => ({ ...prev, [deliveryId]: true }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -855,10 +891,10 @@ export default function DeliveryApp() {
           <div className="flex justify-center mt-2">
             {userMode === UserMode.SENDER && (
               <>
-                {deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open').length > 0 && (
+                {deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open' && !seenBids[r.id]).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
-                    <span>{deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open').length} new bid(s)</span>
+                    <span>{deliveryRequests.filter(r => r.sender === userProfile.npub && r.bids.length > 0 && r.status === 'open' && !seenBids[r.id]).length} new bid(s)</span>
                   </div>
                 )}
                 {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'completed').length > 0 && (
@@ -871,16 +907,16 @@ export default function DeliveryApp() {
             )}
             {userMode === UserMode.COURIER && (
               <>
-                {deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                {deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id) && !seenActiveDeliveries[r.id]).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
-                    <span>{deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} bid(s) accepted</span>
+                    <span>{deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id) && !seenActiveDeliveries[r.id]).length} bid(s) accepted</span>
                   </div>
                 )}
-                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                {!hasViewedCompletedDeliveries && deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
-                    <span>{deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length} delivery(ies) confirmed</span>
+                    <span>Delivery Completed!</span>
                   </div>
                 )}
               </>
@@ -1274,26 +1310,41 @@ export default function DeliveryApp() {
                 <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
               </div>
             ) : userMode === UserMode.SENDER ? (
-              // Show sender's requests with bids
-              deliveryRequests.filter(r => r.sender === userProfile.npub).length === 0 ? (
+              // Show sender's requests with bids (excluding only confirmed, keep completed for review)
+              deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed').length === 0 ? (
                 <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                   <AlertCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
                   <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No requests yet. Create one to get started!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {deliveryRequests.filter(r => r.sender === userProfile.npub).map(request => (
+                  {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed').map(request => (
                     <div key={request.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}` }>Delivery Request</h3>
-                        <span className={`px-4 py-2 rounded-full font-medium text-sm ${
-                          request.status === 'open' ? 'bg-blue-100 text-blue-700' :
-                          request.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                          request.status === 'completed' ? 'bg-purple-100 text-purple-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {request.status}
-                        </span>
+                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}` }>
+                          Delivery Request
+                          {request.bids.length > 0 && request.status === 'open' && !seenBids[request.id] && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          {request.bids.length > 0 && request.status === 'open' && !seenBids[request.id] && (
+                            <button
+                              onClick={() => markBidAsSeen(request.id)}
+                              className={`px-3 py-1 text-sm font-medium rounded-lg ${darkMode ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}
+                            >
+                              Mark Bid as Seen
+                            </button>
+                          )}
+                          <span className={`px-4 py-2 rounded-full font-medium text-sm ${
+                            request.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                            request.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                            request.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {request.status}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Auto-delete Warning */}
@@ -1480,10 +1531,25 @@ export default function DeliveryApp() {
             ) : activeDelivery ? (
               <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Active Delivery</h3>
-                  <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium`}>
-                    {activeDelivery.status}
-                  </span>
+                  <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Active Delivery
+                    {activeDelivery.status === 'accepted' && !seenActiveDeliveries[activeDelivery.id] && (
+                      <span className="text-red-500 ml-1">*</span>
+                    )}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {activeDelivery.status === 'accepted' && !seenActiveDeliveries[activeDelivery.id] && (
+                      <button
+                        onClick={() => markActiveDeliveryAsSeen(activeDelivery.id)}
+                        className={`px-3 py-1 text-sm font-medium rounded-lg ${darkMode ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}
+                      >
+                        Mark Active Delivery as Seen
+                      </button>
+                    )}
+                    <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium`}>
+                      {activeDelivery.status === 'completed' ? '(pending completion)' : activeDelivery.status}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
