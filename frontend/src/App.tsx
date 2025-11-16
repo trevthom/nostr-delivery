@@ -199,7 +199,7 @@ export default function DeliveryApp() {
   const [error, setError] = useState<string | null>(null);
   const [editingDelivery, setEditingDelivery] = useState<DeliveryRequest | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [hasViewedCompletedDeliveries, setHasViewedCompletedDeliveries] = useState(false);
+  const [seenCompletedDeliveries, setSeenCompletedDeliveries] = useState<Set<string>>(new Set());
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -252,26 +252,31 @@ export default function DeliveryApp() {
     }
   }, [isAuthenticated, userMode, backendConnected]);
 
-  // Mark completed deliveries as viewed when courier views the completed tab
+  // Polling: Refresh deliveries and profile every 10 seconds
   useEffect(() => {
-    if (currentView === 'completed' && userMode === UserMode.COURIER) {
-      setHasViewedCompletedDeliveries(true);
-    }
-  }, [currentView, userMode]);
+    if (isAuthenticated && backendConnected) {
+      const interval = setInterval(() => {
+        loadDeliveryRequests();
+      }, 10000);
 
-  // Reset viewed flag when courier has new confirmed deliveries
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, backendConnected]);
+
+  // Refresh profile when settings menu is opened
   useEffect(() => {
-    if (userMode === UserMode.COURIER) {
-      const confirmedCount = deliveryRequests.filter(
-        r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)
-      ).length;
-
-      // Reset flag when there are new confirmed deliveries and user is not currently viewing them
-      if (confirmedCount > 0 && currentView !== 'completed' && hasViewedCompletedDeliveries) {
-        setHasViewedCompletedDeliveries(false);
-      }
+    if (showSettings && isAuthenticated && userProfile.npub) {
+      const refreshProfile = async () => {
+        try {
+          const updatedProfile = await api.getUser(userProfile.npub);
+          setUserProfile({ ...updatedProfile, npub: userProfile.npub, verified_identity: userProfile.verified_identity });
+        } catch (err) {
+          console.error('Failed to refresh profile:', err);
+        }
+      };
+      refreshProfile();
     }
-  }, [deliveryRequests, userMode, userProfile.npub, currentView, hasViewedCompletedDeliveries]);
+  }, [showSettings, isAuthenticated]);
 
   // ============================================================================
   // CONNECTION HANDLERS
@@ -925,7 +930,7 @@ export default function DeliveryApp() {
                     <span>{deliveryRequests.filter(r => r.bids.some(b => b.courier === userProfile.npub) && r.status === 'accepted' && r.bids.find(b => b.courier === userProfile.npub && r.accepted_bid === b.id) && !seenActiveDeliveries[r.id]).length} bid(s) accepted</span>
                   </div>
                 )}
-                {!hasViewedCompletedDeliveries && deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length > 0 && (
+                {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id) && !seenCompletedDeliveries.has(r.id)).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
                     <span>Delivery Completed!</span>
@@ -1054,7 +1059,11 @@ export default function DeliveryApp() {
             <button
               onClick={() => {
                 setCurrentView('completed');
-                setHasViewedCompletedDeliveries(true);
+                // Mark all current confirmed deliveries as seen
+                const confirmedDeliveryIds = deliveryRequests
+                  .filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id))
+                  .map(r => r.id);
+                setSeenCompletedDeliveries(prev => new Set([...prev, ...confirmedDeliveryIds]));
               }}
               className={`px-6 py-3 font-medium transition-colors ${
                 currentView === 'completed'
