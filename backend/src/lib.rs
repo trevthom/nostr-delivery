@@ -61,6 +61,7 @@ pub struct DeliveryRequest {
     pub created_at: i64,
     pub distance_meters: Option<f64>,
     pub proof_of_delivery: Option<ProofOfDelivery>,
+    pub sender_feedback: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
