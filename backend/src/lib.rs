@@ -37,6 +37,14 @@ pub struct PackageInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofOfDelivery {
+    pub images: Vec<String>, // base64 encoded images or URLs
+    pub signature_name: Option<String>,
+    pub timestamp: i64,
+    pub location: Option<GeoPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeliveryRequest {
     pub id: String,
     pub sender: String,
@@ -52,6 +60,7 @@ pub struct DeliveryRequest {
     pub accepted_bid: Option<String>,
     pub created_at: i64,
     pub distance_meters: Option<f64>,
+    pub proof_of_delivery: Option<ProofOfDelivery>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
