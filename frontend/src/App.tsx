@@ -206,6 +206,7 @@ export default function DeliveryApp() {
   const [signatureName, setSignatureName] = useState('');
   const [showCompletionForm, setShowCompletionForm] = useState(false);
   const [senderFeedback, setSenderFeedback] = useState('');
+  const [selectedRating, setSelectedRating] = useState(0);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -536,11 +537,17 @@ export default function DeliveryApp() {
   };
 
   const confirmDelivery = async (delivery: DeliveryRequest) => {
+    if (selectedRating === 0) {
+      setError('Please select a rating before confirming');
+      return;
+    }
+
     try {
       setLoading(true);
-      await api.confirmDelivery(delivery.id, 5, senderFeedback.trim() || undefined);
+      await api.confirmDelivery(delivery.id, selectedRating, senderFeedback.trim() || undefined);
       alert('âœ… Delivery confirmed! Payment released.');
       setSenderFeedback('');
+      setSelectedRating(0);
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -570,11 +577,6 @@ export default function DeliveryApp() {
     const signatureRequired = activeDelivery.packages.some(pkg => pkg.requires_signature);
     if (signatureRequired && !signatureName.trim()) {
       setError('Signature name is required for this delivery');
-      return;
-    }
-
-    if (proofImages.length === 0) {
-      setError('Please upload at least one proof of delivery image');
       return;
     }
 
@@ -881,7 +883,7 @@ export default function DeliveryApp() {
               <div className={`p-4 ${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Reputation</p>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                  {userProfile.reputation.toFixed(1)} ⭐
+                  {userProfile.completed_deliveries === 0 ? 'N/A' : `${userProfile.reputation.toFixed(1)} ⭐`}
                 </p>
               </div>
               <div className={`p-4 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
@@ -1345,6 +1347,34 @@ export default function DeliveryApp() {
                             </div>
                           )}
 
+                          {/* Star Rating */}
+                          <div className="mb-4">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                              Rate the Courier
+                            </label>
+                            <div className="flex gap-2">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  onClick={() => setSelectedRating(star)}
+                                  className={`text-3xl transition-all ${
+                                    selectedRating >= star
+                                      ? 'text-yellow-400 scale-110'
+                                      : darkMode ? 'text-gray-600 hover:text-gray-500' : 'text-gray-300 hover:text-gray-400'
+                                  }`}
+                                >
+                                  ★
+                                </button>
+                              ))}
+                              {selectedRating > 0 && (
+                                <span className={`ml-2 self-center ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {selectedRating} star{selectedRating !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
                           {/* Feedback Input */}
                           <div className="mb-4">
                             <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
@@ -1471,7 +1501,7 @@ export default function DeliveryApp() {
                       {/* Image Upload */}
                       <div>
                         <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
-                          Upload Proof Images *
+                          Upload Proof Images (Optional)
                         </label>
                         <input
                           type="file"
@@ -1632,6 +1662,16 @@ export default function DeliveryApp() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Sender Feedback */}
+                      {delivery.sender_feedback && (
+                        <div className={`mb-4 p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                          <h4 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Your Feedback</h4>
+                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {delivery.sender_feedback}
+                          </p>
                         </div>
                       )}
 
