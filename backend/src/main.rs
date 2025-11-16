@@ -61,6 +61,7 @@ impl AppState {
             accepted_bid: None,
             created_at: Utc::now().timestamp(),
             distance_meters: Some(125000.0), // ~78 miles
+            proof_of_delivery: None,
         };
         deliveries.insert(demo_delivery.id.clone(), demo_delivery);
         
@@ -160,6 +161,7 @@ async fn create_delivery(
         accepted_bid: None,
         created_at: Utc::now().timestamp(),
         distance_meters: distance,
+        proof_of_delivery: None,
     };
     
     data.deliveries.lock().unwrap().insert(id.clone(), delivery.clone());
@@ -409,7 +411,7 @@ async fn cancel_delivery(
 ) -> Result<HttpResponse, Error> {
     let mut deliveries = data.deliveries.lock().unwrap();
     let mut users = data.users.lock().unwrap();
-    
+
     if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
         if delivery.status != DeliveryStatus::Accepted && delivery.status != DeliveryStatus::InTransit {
             return Ok(HttpResponse::BadRequest().json(serde_json::json!({
@@ -426,10 +428,57 @@ async fn cancel_delivery(
         }
 
         deliveries.remove(delivery_id.as_str());
-        
+
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "status": "cancelled",
             "message": "Delivery cancelled and sats forfeited to courier"
+        })))
+    } else {
+        Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Delivery not found"
+        })))
+    }
+}
+
+#[derive(Deserialize)]
+struct CompleteDeliveryRequest {
+    images: Vec<String>,
+    signature_name: Option<String>,
+}
+
+async fn complete_delivery(
+    data: web::Data<AppState>,
+    delivery_id: web::Path<String>,
+    req: web::Json<CompleteDeliveryRequest>,
+) -> Result<HttpResponse, Error> {
+    let mut deliveries = data.deliveries.lock().unwrap();
+
+    if let Some(delivery) = deliveries.get_mut(delivery_id.as_str()) {
+        if delivery.status != DeliveryStatus::Accepted && delivery.status != DeliveryStatus::InTransit {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Can only complete accepted or in-transit deliveries"
+            })));
+        }
+
+        // Check if signature is required
+        let signature_required = delivery.packages.iter().any(|pkg| pkg.requires_signature);
+        if signature_required && req.signature_name.is_none() {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Signature required for this delivery"
+            })));
+        }
+
+        delivery.proof_of_delivery = Some(ProofOfDelivery {
+            images: req.images.clone(),
+            signature_name: req.signature_name.clone(),
+            timestamp: Utc::now().timestamp(),
+            location: None,
+        });
+        delivery.status = DeliveryStatus::Completed;
+
+        Ok(HttpResponse::Ok().json(serde_json::json!({
+            "status": "completed",
+            "delivery": delivery.clone()
         })))
     } else {
         Ok(HttpResponse::NotFound().json(serde_json::json!({
@@ -512,6 +561,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/deliveries/{id}/accept/{bid_idx}", web::post().to(accept_bid))
             .route("/api/deliveries/{id}/status", web::patch().to(update_delivery_status))
             .route("/api/deliveries/{id}/cancel", web::post().to(cancel_delivery))
+            .route("/api/deliveries/{id}/complete", web::post().to(complete_delivery))
             .route("/api/deliveries/{id}/confirm", web::post().to(confirm_delivery))
             .route("/api/user/{npub}", web::get().to(get_user))
             .route("/api/user/{npub}", web::patch().to(update_user))

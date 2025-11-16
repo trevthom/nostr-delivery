@@ -192,6 +192,11 @@ export default function DeliveryApp() {
   const [nsecInput, setNsecInput] = useState('');
   const [loginMode, setLoginMode] = useState<'demo' | 'nsec'>('demo');
 
+  // Delivery Completion State
+  const [proofImages, setProofImages] = useState<string[]>([]);
+  const [signatureName, setSignatureName] = useState('');
+  const [showCompletionForm, setShowCompletionForm] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState({
     pickupAddress: '',
@@ -522,7 +527,7 @@ export default function DeliveryApp() {
 
   const confirmDelivery = async () => {
     if (!activeDelivery) return;
-    
+
     try {
       setLoading(true);
       await api.confirmDelivery(activeDelivery.id, 5);
@@ -532,6 +537,60 @@ export default function DeliveryApp() {
       setError(null);
     } catch (err) {
       setError('Failed to confirm delivery');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImages(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const completeDelivery = async () => {
+    if (!activeDelivery) return;
+
+    const signatureRequired = activeDelivery.packages.some(pkg => pkg.requires_signature);
+    if (signatureRequired && !signatureName.trim()) {
+      setError('Signature name is required for this delivery');
+      return;
+    }
+
+    if (proofImages.length === 0) {
+      setError('Please upload at least one proof of delivery image');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/deliveries/${activeDelivery.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: proofImages,
+          signature_name: signatureName.trim() || undefined
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to complete delivery');
+
+      alert('âœ… Delivery marked as completed! Awaiting sender confirmation.');
+      setProofImages([]);
+      setSignatureName('');
+      setShowCompletionForm(false);
+      await loadDeliveryRequests();
+      setError(null);
+    } catch (err) {
+      setError('Failed to complete delivery');
       console.error(err);
     } finally {
       setLoading(false);
@@ -591,34 +650,28 @@ export default function DeliveryApp() {
 
   if (showLogin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+      <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-purple-50'} flex items-center justify-center p-4`}>
+        <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-2xl shadow-xl max-w-md w-full p-8`}>
           <div className="text-center mb-8">
             <Package className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Nostr Delivery</h1>
-            <p className="text-gray-600">Decentralized peer-to-peer delivery network</p>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>Nostr Delivery</h1>
+            <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Decentralized peer-to-peer delivery network</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className={`mb-4 p-3 ${darkMode ? 'bg-red-900 border-red-700 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} border rounded-lg text-sm`}>
               {error}
             </div>
           )}
 
           {/* Login Mode Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-gray-200">
+          <div className={`flex gap-2 mb-6 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
             <button
               onClick={() => setLoginMode('demo')}
               className={`flex-1 px-4 py-3 font-medium transition-colors ${
                 loginMode === 'demo'
                   ? 'border-b-2 border-orange-500 text-orange-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Demo Mode
@@ -628,7 +681,7 @@ export default function DeliveryApp() {
               className={`flex-1 px-4 py-3 font-medium transition-colors ${
                 loginMode === 'nsec'
                   ? 'border-b-2 border-orange-500 text-orange-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Nostr Login
@@ -653,8 +706,8 @@ export default function DeliveryApp() {
                 )}
               </button>
 
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
+              <div className={`mt-4 p-4 ${darkMode ? 'bg-blue-900 border-blue-700' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
                   <strong>ðŸ'¡ Demo Mode:</strong> Test the application without real Nostr or Lightning integration.
                 </p>
               </div>
@@ -665,7 +718,7 @@ export default function DeliveryApp() {
           {loginMode === 'nsec' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Nostr Private Key (nsec)
                 </label>
                 <input
@@ -678,9 +731,9 @@ export default function DeliveryApp() {
                     }
                   }}
                   placeholder="nsec1..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm`}
                 />
-                <p className="mt-2 text-xs text-gray-500">
+                <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   Enter your Nostr private key (nsec1...) to login
                 </p>
               </div>
@@ -700,8 +753,8 @@ export default function DeliveryApp() {
                 )}
               </button>
 
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-900">
+              <div className={`mt-4 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
                   <strong>âš ï¸ Security:</strong> Your nsec is only used to derive your npub and is not stored. For maximum security, use a Nostr extension instead.
                 </p>
               </div>
@@ -716,8 +769,8 @@ export default function DeliveryApp() {
           </div>
 
           {!backendConnected && (
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-900">
+            <div className={`mt-6 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
+              <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
                 <strong>âš ï¸ Backend not connected.</strong> Make sure the backend server is running on http://localhost:8080
               </p>
             </div>
@@ -732,15 +785,15 @@ export default function DeliveryApp() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50">
+    <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-purple-50'}`}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Package className="w-8 h-8 text-orange-500" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Nostr Delivery</h1>
-              <p className="text-xs text-gray-500">
+              <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nostr Delivery</h1>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 {authType === 'nsec' ? formatNpubForDisplay(userProfile.npub) : 'Demo Mode'}
               </p>
             </div>
@@ -753,7 +806,7 @@ export default function DeliveryApp() {
                 setUserMode(e.target.value as UserMode);
                 setCurrentView(e.target.value === UserMode.SENDER ? 'create' : 'browse');
               }}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className={`px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500`}
             >
               <option value={UserMode.SENDER}>I'm Sending</option>
               <option value={UserMode.COURIER}>I'm Delivering</option>
@@ -761,16 +814,16 @@ export default function DeliveryApp() {
 
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className={`p-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
             >
-              <Settings className="w-5 h-5 text-gray-600" />
+              <Settings className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
             </button>
 
             <button
               onClick={handleLogout}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className={`p-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
             >
-              <LogOut className="w-5 h-5 text-gray-600" />
+              <LogOut className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
             </button>
           </div>
         </div>
@@ -779,9 +832,9 @@ export default function DeliveryApp() {
       {/* Error Banner */}
       {error && (
         <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-            <span className="text-red-700 text-sm">{error}</span>
-            <button onClick={() => setError(null)} className="text-red-700">âœ•</button>
+          <div className={`${darkMode ? 'bg-red-900 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-3 flex items-center justify-between`}>
+            <span className={`${darkMode ? 'text-red-200' : 'text-red-700'} text-sm`}>{error}</span>
+            <button onClick={() => setError(null)} className={darkMode ? 'text-red-200' : 'text-red-700'}>âœ•</button>
           </div>
         </div>
       )}
@@ -789,15 +842,15 @@ export default function DeliveryApp() {
       {/* Settings Panel */}
       {showSettings && (
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold mb-6">Settings</h2>
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+            <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Settings</h2>
             
             {/* Dark Mode Toggle */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className={`mb-6 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Dark Mode</h3>
-                  <p className="text-sm text-gray-600">Switch between light and dark theme</p>
+                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'} mb-1`}>Dark Mode</h3>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Switch between light and dark theme</p>
                 </div>
                 <button
                   onClick={() => setDarkMode(!darkMode)}
@@ -815,23 +868,23 @@ export default function DeliveryApp() {
             </div>
 
             {/* Profile Section */}
-            <h3 className="text-lg font-bold mb-4">Profile</h3>
+            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Profile</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-orange-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Reputation</p>
-                <p className="text-2xl font-bold text-orange-600">
+              <div className={`p-4 ${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Reputation</p>
+                <p className={`text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                   {userProfile.reputation.toFixed(1)} ⭐
                 </p>
               </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Completed</p>
-                <p className="text-2xl font-bold text-green-600">
+              <div className={`p-4 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Completed</p>
+                <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
                   {userProfile.completed_deliveries}
                 </p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">ID</p>
-                <p className="text-xs font-mono text-blue-600 truncate">
+              <div className={`p-4 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>ID</p>
+                <p className={`text-xs font-mono ${darkMode ? 'text-blue-400' : 'text-blue-600'} truncate`}>
                   {userProfile.npub}
                 </p>
               </div>
@@ -842,14 +895,14 @@ export default function DeliveryApp() {
 
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex gap-2 border-b border-gray-200">
+        <div className={`flex gap-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
           {userMode === UserMode.SENDER && (
             <button
               onClick={() => setCurrentView('create')}
               className={`px-6 py-3 font-medium transition-colors ${
                 currentView === 'create'
                   ? 'border-b-2 border-orange-500 text-orange-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Create Request
@@ -861,7 +914,7 @@ export default function DeliveryApp() {
               className={`px-6 py-3 font-medium transition-colors ${
                 currentView === 'browse'
                   ? 'border-b-2 border-orange-500 text-orange-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Browse Jobs
@@ -872,7 +925,7 @@ export default function DeliveryApp() {
             className={`px-6 py-3 font-medium transition-colors ${
               currentView === 'active'
                 ? 'border-b-2 border-orange-500 text-orange-600'
-                : 'text-gray-600 hover:text-gray-900'
+                : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             {userMode === UserMode.SENDER ? 'My Requests' : 'Active Deliveries'}
@@ -884,19 +937,19 @@ export default function DeliveryApp() {
       <div className="max-w-7xl mx-auto px-4 pb-8">
         {/* CREATE REQUEST VIEW */}
         {currentView === 'create' && userMode === UserMode.SENDER && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold mb-6">
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+            <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               {editingDelivery ? 'Edit Delivery Request' : 'Create Delivery Request'}
             </h2>
             
             {editingDelivery && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                <span className="text-blue-700 text-sm">
+              <div className={`mb-4 p-3 ${darkMode ? 'bg-blue-900 border-blue-700' : 'bg-blue-50 border-blue-200'} border rounded-lg flex items-center justify-between`}>
+                <span className={`${darkMode ? 'text-blue-200' : 'text-blue-700'} text-sm`}>
                   <strong>Editing:</strong> You can modify this request until it's accepted by a courier.
                 </span>
                 <button
                   onClick={cancelEditingDelivery}
-                  className="text-blue-700 hover:text-blue-900 text-sm font-medium"
+                  className={`${darkMode ? 'text-blue-200 hover:text-blue-100' : 'text-blue-700 hover:text-blue-900'} text-sm font-medium`}
                 >
                   Cancel Edit
                 </button>
@@ -905,49 +958,49 @@ export default function DeliveryApp() {
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Location *</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Pickup Location *</label>
                 <input
                   type="text"
                   value={formData.pickupAddress}
                   onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
                   placeholder="123 Main St, City, State ZIP"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
                 />
                 <input
                   type="text"
                   value={formData.pickupInstructions}
                   onChange={(e) => setFormData({ ...formData, pickupInstructions: e.target.value })}
                   placeholder="Special instructions (optional)"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mt-2 focus:ring-2 focus:ring-orange-500"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mt-2 focus:ring-2 focus:ring-orange-500`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Dropoff Location *</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Dropoff Location *</label>
                 <input
                   type="text"
                   value={formData.dropoffAddress}
                   onChange={(e) => setFormData({ ...formData, dropoffAddress: e.target.value })}
                   placeholder="456 Oak Ave, City, State ZIP"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                 />
                 <input
                   type="text"
                   value={formData.dropoffInstructions}
                   onChange={(e) => setFormData({ ...formData, dropoffInstructions: e.target.value })}
                   placeholder="Delivery instructions (optional)"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mt-2 focus:ring-2 focus:ring-orange-500"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mt-2 focus:ring-2 focus:ring-orange-500`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Packages</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Packages</label>
                 {formData.packages.map((pkg, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4 mb-3">
+                  <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 mb-3`}>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-medium text-gray-900">Package {index + 1}</span>
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Package {index + 1}</span>
                       {formData.packages.length > 1 && (
-                        <button onClick={() => removePackage(index)} className="text-red-600 hover:text-red-700 text-sm">
+                        <button onClick={() => removePackage(index)} className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'} text-sm`}>
                           Remove
                         </button>
                       )}
@@ -955,7 +1008,7 @@ export default function DeliveryApp() {
                     <select
                       value={pkg.size}
                       onChange={(e) => updatePackage(index, { size: e.target.value as PackageSize })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white' : 'border-gray-300 bg-white'} rounded-lg mb-2`}
                     >
                       <option value={PackageSize.ENVELOPE}>Envelope (documents, up to 1 lb)</option>
                       <option value={PackageSize.SMALL}>Small (shoebox, 1-5 lbs)</option>
@@ -968,10 +1021,10 @@ export default function DeliveryApp() {
                       value={pkg.description}
                       onChange={(e) => updatePackage(index, { description: e.target.value })}
                       placeholder="Description"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mb-2`}
                     />
                     <div className="flex gap-4">
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         <input
                           type="checkbox"
                           checked={pkg.fragile}
@@ -980,7 +1033,7 @@ export default function DeliveryApp() {
                         />
                         Fragile
                       </label>
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         <input
                           type="checkbox"
                           checked={pkg.requires_signature}
@@ -998,11 +1051,11 @@ export default function DeliveryApp() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time Window</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Time Window</label>
                 <select
                   value={formData.timeWindow}
                   onChange={(e) => setFormData({ ...formData, timeWindow: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                 >
                   <option value="asap">ASAP (within 2 hours)</option>
                   <option value="today">Today (by end of day)</option>
@@ -1014,13 +1067,13 @@ export default function DeliveryApp() {
                     type="date"
                     value={formData.customDate}
                     onChange={(e) => setFormData({ ...formData, customDate: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg mt-2 focus:ring-2 focus:ring-orange-500"
+                    className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg mt-2 focus:ring-2 focus:ring-orange-500`}
                   />
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Offer Amount (sats) *</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Offer Amount (sats) *</label>
                 <div className="relative">
                   <Bitcoin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-orange-500" />
                   <input
@@ -1028,7 +1081,7 @@ export default function DeliveryApp() {
                     value={formData.offerAmount}
                     onChange={(e) => setFormData({ ...formData, offerAmount: e.target.value })}
                     placeholder="25000"
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    className={`w-full pl-12 pr-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                   />
                 </div>
               </div>
@@ -1052,7 +1105,7 @@ export default function DeliveryApp() {
         {/* BROWSE JOBS VIEW */}
         {currentView === 'browse' && userMode === UserMode.COURIER && (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold mb-4">Available Delivery Jobs</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Available Delivery Jobs</h2>
             {loading ? (
               <div className="bg-white rounded-xl shadow-lg p-12 text-center">
                 <p className="text-gray-500">â³ Loading deliveries...</p>
@@ -1071,11 +1124,11 @@ export default function DeliveryApp() {
                         <MapPin className="w-5 h-5 text-orange-500" />
                         <span className="font-bold text-lg">{request.pickup.address}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-gray-600">
+                      <div className={`flex items-center gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                         <MapPin className="w-5 h-5" />
                         <span>{request.dropoff.address}</span>
                       </div>
-                      <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                      <div className={`flex items-center gap-4 mt-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           {request.time_window}
@@ -1086,17 +1139,17 @@ export default function DeliveryApp() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-3xl font-bold text-orange-600">
+                      <div className={`text-3xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                         {request.offer_amount.toLocaleString()}
                       </div>
-                      <div className="text-sm text-gray-500">sats</div>
+                      <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>sats</div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-4">
                     {request.packages.map((pkg, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-gray-100 rounded-full text-sm">
-                        {pkg.size} {pkg.fragile && 'ðŸ”´'}
+                      <span key={idx} className={`px-3 py-1 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-full text-sm`}>
+                        {pkg.size} {pkg.fragile && 'ðŸ"´'}
                       </span>
                     ))}
                   </div>
@@ -1161,12 +1214,12 @@ export default function DeliveryApp() {
 
                       <div className="grid md:grid-cols-2 gap-4 mb-4">
                         <div>
-                          <p className="text-sm text-gray-500">Pickup</p>
-                          <p className="font-medium">{request.pickup.address}</p>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup</p>
+                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Dropoff</p>
-                          <p className="font-medium">{request.dropoff.address}</p>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Dropoff</p>
+                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
                         </div>
                       </div>
 
@@ -1239,10 +1292,10 @@ export default function DeliveryApp() {
                 </div>
               )
             ) : activeDelivery ? (
-              <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold">Active Delivery</h3>
-                  <span className="px-4 py-2 bg-green-100 text-green-700 rounded-full font-medium">
+                  <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Active Delivery</h3>
+                  <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium`}>
                     {activeDelivery.status}
                   </span>
                 </div>
@@ -1250,20 +1303,20 @@ export default function DeliveryApp() {
                 <div className="space-y-6">
                   {/* Pickup and Dropoff */}
                   <div className="grid md:grid-cols-2 gap-6">
-                    <div className="p-4 bg-orange-50 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-2 font-semibold">Pickup Location</p>
-                      <p className="font-medium mb-1">{activeDelivery.pickup.address}</p>
+                    <div className={`p-4 ${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg`}>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2 font-semibold`}>Pickup Location</p>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{activeDelivery.pickup.address}</p>
                       {activeDelivery.pickup.instructions && (
-                        <p className="text-sm text-gray-600 mt-2">
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-2`}>
                           <strong>Instructions:</strong> {activeDelivery.pickup.instructions}
                         </p>
                       )}
                     </div>
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-2 font-semibold">Dropoff Location</p>
-                      <p className="font-medium mb-1">{activeDelivery.dropoff.address}</p>
+                    <div className={`p-4 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2 font-semibold`}>Dropoff Location</p>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{activeDelivery.dropoff.address}</p>
                       {activeDelivery.dropoff.instructions && (
-                        <p className="text-sm text-gray-600 mt-2">
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-2`}>
                           <strong>Instructions:</strong> {activeDelivery.dropoff.instructions}
                         </p>
                       )}
@@ -1271,24 +1324,24 @@ export default function DeliveryApp() {
                   </div>
 
                   {/* Package Details */}
-                  <div className="border-t pt-4">
-                    <h4 className="font-semibold mb-3">Package Details</h4>
+                  <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-4`}>
+                    <h4 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Package Details</h4>
                     <div className="space-y-2">
                       {activeDelivery.packages.map((pkg, idx) => (
-                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                        <div key={idx} className={`p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
                           <div className="flex items-center justify-between">
-                            <span className="font-medium capitalize">{pkg.size.replace('_', ' ')}</span>
+                            <span className={`font-medium capitalize ${darkMode ? 'text-white' : 'text-gray-900'}`}>{pkg.size.replace('_', ' ')}</span>
                             <div className="flex gap-2">
                               {pkg.fragile && (
-                                <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">Fragile</span>
+                                <span className={`px-2 py-1 ${darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-700'} text-xs rounded`}>Fragile</span>
                               )}
                               {pkg.requires_signature && (
-                                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Signature Required</span>
+                                <span className={`px-2 py-1 ${darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'} text-xs rounded`}>Signature Required</span>
                               )}
                             </div>
                           </div>
                           {pkg.description && (
-                            <p className="text-sm text-gray-600 mt-1">{pkg.description}</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-1`}>{pkg.description}</p>
                           )}
                         </div>
                       ))}
@@ -1296,30 +1349,119 @@ export default function DeliveryApp() {
                   </div>
 
                   {/* Delivery Info */}
-                  <div className="grid md:grid-cols-3 gap-4 border-t pt-4">
-                    <div className="p-3 bg-green-50 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-1">Payment</p>
-                      <p className="text-2xl font-bold text-green-600">
+                  <div className={`grid md:grid-cols-3 gap-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-4`}>
+                    <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Payment</p>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
                         {activeDelivery.offer_amount.toLocaleString()} sats
                       </p>
                     </div>
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-1">Time Window</p>
-                      <p className="font-medium capitalize">{activeDelivery.time_window}</p>
+                    <div className={`p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Time Window</p>
+                      <p className={`font-medium capitalize ${darkMode ? 'text-white' : 'text-gray-900'}`}>{activeDelivery.time_window}</p>
                     </div>
                     {activeDelivery.distance_meters && (
-                      <div className="p-3 bg-yellow-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Distance</p>
-                        <p className="font-medium">~{Math.round(activeDelivery.distance_meters / 1609)} miles</p>
+                      <div className={`p-3 ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'} rounded-lg`}>
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Distance</p>
+                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>~{Math.round(activeDelivery.distance_meters / 1609)} miles</p>
                       </div>
                     )}
                   </div>
+
+                  {/* Mark as Delivered Button */}
+                  {(activeDelivery.status === 'accepted' || activeDelivery.status === 'intransit') && !showCompletionForm && (
+                    <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-4 mt-4`}>
+                      <button
+                        onClick={() => setShowCompletionForm(true)}
+                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Mark as Delivered
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Delivery Completion Form */}
+                  {showCompletionForm && (
+                    <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-4 mt-4 space-y-4`}>
+                      <h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Proof of Delivery</h4>
+
+                      {/* Image Upload */}
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                          Upload Proof Images *
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
+                        />
+                        {proofImages.length > 0 && (
+                          <p className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {proofImages.length} image(s) selected
+                          </p>
+                        )}
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {proofImages.map((img, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={img} alt={`Proof ${idx + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                              <button
+                                onClick={() => setProofImages(prev => prev.filter((_, i) => i !== idx))}
+                                className={`absolute top-1 right-1 ${darkMode ? 'bg-red-900 text-red-200' : 'bg-red-500 text-white'} rounded-full w-6 h-6 flex items-center justify-center text-xs`}
+                              >
+                                âœ•
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Signature Name (if required) */}
+                      {activeDelivery.packages.some(pkg => pkg.requires_signature) && (
+                        <div>
+                          <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                            Recipient Signature Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={signatureName}
+                            onChange={(e) => setSignatureName(e.target.value)}
+                            placeholder="Enter name of person who signed"
+                            className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowCompletionForm(false);
+                            setProofImages([]);
+                            setSignatureName('');
+                          }}
+                          className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${darkMode ? 'text-white' : 'text-gray-900'} font-medium py-3 rounded-lg transition-colors`}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={completeDelivery}
+                          disabled={loading}
+                          className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          {loading ? 'Submitting...' : 'Submit Proof & Complete'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No active deliveries. Browse available jobs to start earning!</p>
+              <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
+                <AlertCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No active deliveries. Browse available jobs to start earning!</p>
               </div>
             )}
           </div>
