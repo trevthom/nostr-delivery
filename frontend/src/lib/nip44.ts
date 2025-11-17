@@ -7,8 +7,7 @@
  * for authenticated encryption of messages between Nostr users.
  */
 
-import * as secp256k1 from '@noble/secp256k1';
-import { hexToBytes } from './crypto';
+import { secp256k1, hexToBytes } from './crypto';
 
 // Constants for NIP-44 v2
 const VERSION = 2;

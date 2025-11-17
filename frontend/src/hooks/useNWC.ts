@@ -19,9 +19,8 @@ import {
   NWCNotification,
 } from '../types/nwc';
 import { encryptMessage, decryptMessage } from '../lib/nip44';
-// Import crypto module to ensure HMAC-SHA256 is configured for secp256k1 signing
-import { generateEventId, hexToBytes } from '../lib/crypto';
-import * as secp256k1 from '@noble/secp256k1';
+// Import secp256k1 from crypto module to use the configured instance with HMAC-SHA256 support
+import { generateEventId, hexToBytes, secp256k1 } from '../lib/crypto';
 
 export interface UseNWCReturn {
   connectionState: NWCConnectionState;

@@ -15,6 +15,10 @@ import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
   return h.digest();
 };
 
+// Export the configured secp256k1 instance for use throughout the application
+// This ensures all modules use the same configured instance with HMAC-SHA256 support
+export { secp256k1 };
+
 /**
  * Generate random hex string
  */
