@@ -14,7 +14,8 @@ enum PackageSize {
   SMALL = 'small',
   MEDIUM = 'medium',
   LARGE = 'large',
-  EXTRA_LARGE = 'extra_large'
+  EXTRA_LARGE = 'extra_large',
+  UNKNOWN = 'unknown'
 }
 
 interface PackageInfo {
@@ -23,6 +24,16 @@ interface PackageInfo {
   description: string;
   fragile: boolean;
   requires_signature: boolean;
+}
+
+interface PersonInfo {
+  count: number;
+  special_instructions?: string;
+}
+
+interface AnimalInfo {
+  count: number;
+  special_instructions?: string;
 }
 
 interface Location {
@@ -45,6 +56,8 @@ interface DeliveryRequest {
   pickup: Location;
   dropoff: Location;
   packages: PackageInfo[];
+  persons?: PersonInfo;
+  animals?: AnimalInfo;
   offer_amount: number;
   insurance_amount?: number;
   time_window: string;
@@ -234,12 +247,25 @@ export default function DeliveryApp() {
     pickupInstructions: '',
     dropoffAddress: '',
     dropoffInstructions: '',
+    transportTypes: {
+      package: false,
+      person: false,
+      animal: false
+    },
     packages: [{
       size: PackageSize.SMALL,
       description: '',
       fragile: false,
       requires_signature: false
     }] as PackageInfo[],
+    persons: {
+      count: 1,
+      special_instructions: ''
+    },
+    animals: {
+      count: 1,
+      special_instructions: ''
+    },
     offerAmount: '',
     insuranceAmount: '',
     timeWindow: 'asap',
@@ -467,16 +493,21 @@ export default function DeliveryApp() {
 
   const createDeliveryRequest = async () => {
     try {
-      const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate } = formData;
-      
+      const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate, transportTypes, persons, animals } = formData;
+
       if (!pickupAddress || !dropoffAddress || !offerAmount) {
         setError('Please fill in all required fields');
         return;
       }
 
+      if (!transportTypes.package && !transportTypes.person && !transportTypes.animal) {
+        setError('Please select at least one transport type (Person, Animal, or Package)');
+        return;
+      }
+
       setLoading(true);
 
-      const deliveryData = {
+      const deliveryData: any = {
         sender: userProfile.npub,
         pickup: {
           address: pickupAddress,
@@ -486,11 +517,19 @@ export default function DeliveryApp() {
           address: dropoffAddress,
           instructions: formData.dropoffInstructions || undefined
         },
-        packages,
+        packages: transportTypes.package ? packages : [],
         offer_amount: parseInt(offerAmount),
         insurance_amount: insuranceAmount ? parseInt(insuranceAmount) : undefined,
         time_window: timeWindow === 'custom' ? customDate : timeWindow
       };
+
+      if (transportTypes.person) {
+        deliveryData.persons = persons;
+      }
+
+      if (transportTypes.animal) {
+        deliveryData.animals = animals;
+      }
 
       await api.createDelivery(deliveryData);
       alert('âœ… Delivery request created!');
@@ -594,18 +633,23 @@ export default function DeliveryApp() {
 
   const updateDeliveryRequest = async () => {
     if (!editingDelivery) return;
-    
+
     try {
-      const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate } = formData;
-      
+      const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate, transportTypes, persons, animals } = formData;
+
       if (!pickupAddress || !dropoffAddress || !offerAmount) {
         setError('Please fill in all required fields');
         return;
       }
 
+      if (!transportTypes.package && !transportTypes.person && !transportTypes.animal) {
+        setError('Please select at least one transport type (Person, Animal, or Package)');
+        return;
+      }
+
       setLoading(true);
 
-      const deliveryData = {
+      const deliveryData: any = {
         pickup: {
           address: pickupAddress,
           instructions: formData.pickupInstructions || undefined
@@ -614,11 +658,19 @@ export default function DeliveryApp() {
           address: dropoffAddress,
           instructions: formData.dropoffInstructions || undefined
         },
-        packages,
+        packages: transportTypes.package ? packages : [],
         offer_amount: parseInt(offerAmount),
         insurance_amount: insuranceAmount ? parseInt(insuranceAmount) : undefined,
         time_window: timeWindow === 'custom' ? customDate : timeWindow
       };
+
+      if (transportTypes.person) {
+        deliveryData.persons = persons;
+      }
+
+      if (transportTypes.animal) {
+        deliveryData.animals = animals;
+      }
 
       await api.updateDelivery(editingDelivery.id, deliveryData);
       alert('âœ… Delivery request updated!');
@@ -642,7 +694,25 @@ export default function DeliveryApp() {
       pickupInstructions: delivery.pickup.instructions || '',
       dropoffAddress: delivery.dropoff.address,
       dropoffInstructions: delivery.dropoff.instructions || '',
-      packages: delivery.packages,
+      transportTypes: {
+        package: delivery.packages && delivery.packages.length > 0,
+        person: !!delivery.persons,
+        animal: !!delivery.animals
+      },
+      packages: delivery.packages && delivery.packages.length > 0 ? delivery.packages : [{
+        size: PackageSize.SMALL,
+        description: '',
+        fragile: false,
+        requires_signature: false
+      }],
+      persons: delivery.persons || {
+        count: 1,
+        special_instructions: ''
+      },
+      animals: delivery.animals || {
+        count: 1,
+        special_instructions: ''
+      },
       offerAmount: delivery.offer_amount.toString(),
       insuranceAmount: delivery.insurance_amount?.toString() || '',
       timeWindow: delivery.time_window,
@@ -825,12 +895,25 @@ export default function DeliveryApp() {
       pickupInstructions: '',
       dropoffAddress: '',
       dropoffInstructions: '',
+      transportTypes: {
+        package: false,
+        person: false,
+        animal: false
+      },
       packages: [{
         size: PackageSize.SMALL,
         description: '',
         fragile: false,
         requires_signature: false
       }],
+      persons: {
+        count: 1,
+        special_instructions: ''
+      },
+      animals: {
+        count: 1,
+        special_instructions: ''
+      },
       offerAmount: '',
       insuranceAmount: '',
       timeWindow: 'asap',
@@ -1385,6 +1468,109 @@ export default function DeliveryApp() {
               </div>
 
               <div>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>What are you transporting? *</label>
+                <div className="flex flex-wrap gap-3">
+                  <label className={`flex items-center gap-2 px-4 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-white'} rounded-lg cursor-pointer ${formData.transportTypes.person ? (darkMode ? 'ring-2 ring-orange-500 bg-gray-600' : 'ring-2 ring-orange-500 bg-orange-50') : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.transportTypes.person}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        transportTypes: { ...formData.transportTypes, person: e.target.checked }
+                      })}
+                      className="rounded"
+                    />
+                    <span className={darkMode ? 'text-gray-200' : 'text-gray-700'}>Person</span>
+                  </label>
+                  <label className={`flex items-center gap-2 px-4 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-white'} rounded-lg cursor-pointer ${formData.transportTypes.animal ? (darkMode ? 'ring-2 ring-orange-500 bg-gray-600' : 'ring-2 ring-orange-500 bg-orange-50') : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.transportTypes.animal}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        transportTypes: { ...formData.transportTypes, animal: e.target.checked }
+                      })}
+                      className="rounded"
+                    />
+                    <span className={darkMode ? 'text-gray-200' : 'text-gray-700'}>Animal</span>
+                  </label>
+                  <label className={`flex items-center gap-2 px-4 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-white'} rounded-lg cursor-pointer ${formData.transportTypes.package ? (darkMode ? 'ring-2 ring-orange-500 bg-gray-600' : 'ring-2 ring-orange-500 bg-orange-50') : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.transportTypes.package}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        transportTypes: { ...formData.transportTypes, package: e.target.checked }
+                      })}
+                      className="rounded"
+                    />
+                    <span className={darkMode ? 'text-gray-200' : 'text-gray-700'}>Package</span>
+                  </label>
+                </div>
+              </div>
+
+              {formData.transportTypes.person && (
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Person Details</label>
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                    <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Number of Persons</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.persons.count}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        persons: { ...formData.persons, count: Math.max(1, parseInt(e.target.value) || 1) }
+                      })}
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white' : 'border-gray-300 bg-white'} rounded-lg mb-3`}
+                    />
+                    <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Special Instructions (optional)</label>
+                    <textarea
+                      value={formData.persons.special_instructions}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        persons: { ...formData.persons, special_instructions: e.target.value }
+                      })}
+                      placeholder="Any special requirements or notes..."
+                      rows={3}
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.transportTypes.animal && (
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Animal Details</label>
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                    <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Number of Animals</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.animals.count}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        animals: { ...formData.animals, count: Math.max(1, parseInt(e.target.value) || 1) }
+                      })}
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white' : 'border-gray-300 bg-white'} rounded-lg mb-3`}
+                    />
+                    <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Special Instructions (optional)</label>
+                    <textarea
+                      value={formData.animals.special_instructions}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        animals: { ...formData.animals, special_instructions: e.target.value }
+                      })}
+                      placeholder="Any special requirements or notes..."
+                      rows={3}
+                      className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.transportTypes.package && (
+                <div>
                 <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Packages</label>
                 {formData.packages.map((pkg, index) => (
                   <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 mb-3`}>
@@ -1406,6 +1592,7 @@ export default function DeliveryApp() {
                       <option value={PackageSize.MEDIUM}>Medium (12x12x12", 5-20 lbs)</option>
                       <option value={PackageSize.LARGE}>Large (18x18x18", 20-50 lbs)</option>
                       <option value={PackageSize.EXTRA_LARGE}>Extra Large (moving box, 50+ lbs)</option>
+                      <option value={PackageSize.UNKNOWN}>Unknown Size</option>
                     </select>
                     <input
                       type="text"
@@ -1439,7 +1626,8 @@ export default function DeliveryApp() {
                 <button onClick={addPackage} className="text-orange-600 hover:text-orange-700 font-medium text-sm">
                   + Add Another Package
                 </button>
-              </div>
+                </div>
+              )}
 
               <div>
                 <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Time Window</label>
@@ -1555,7 +1743,7 @@ export default function DeliveryApp() {
                           <button
                             onClick={() => !hasBid && placeBid(request.id, request.offer_amount)}
                             disabled={loading || hasBid}
-                            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
+                            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
                           >
                             {hasBid
                               ? `Bid Sent for ${existingBid.amount.toLocaleString()} sats`

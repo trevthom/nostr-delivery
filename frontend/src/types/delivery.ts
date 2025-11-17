@@ -8,7 +8,8 @@ export enum PackageSize {
   SMALL = 'small',
   MEDIUM = 'medium',
   LARGE = 'large',
-  EXTRA_LARGE = 'extra_large'
+  EXTRA_LARGE = 'extra_large',
+  UNKNOWN = 'unknown'
 }
 
 /**
@@ -26,6 +27,22 @@ export interface PackageInfo {
     height: number;
   };
   tracking_number?: string;
+}
+
+/**
+ * Person transport information
+ */
+export interface PersonInfo {
+  count: number; // number of persons >= 1
+  special_instructions?: string;
+}
+
+/**
+ * Animal transport information
+ */
+export interface AnimalInfo {
+  count: number; // number of animals >= 1
+  special_instructions?: string;
 }
 
 /**
@@ -83,6 +100,8 @@ export interface DeliveryRequest {
   pickup: Location;
   dropoff: Location;
   packages: PackageInfo[];
+  persons?: PersonInfo;
+  animals?: AnimalInfo;
   offer_amount: number; // in sats
   insurance_amount?: number; // in sats
   time_window: TimeWindow | string;
