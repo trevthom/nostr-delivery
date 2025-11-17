@@ -538,9 +538,13 @@ export default function DeliveryApp() {
       if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
         try {
           // Check if sender has sufficient balance
-          const hasBalance = await hasSufficientBalance(nwc, bid.amount);
-          if (!hasBalance) {
-            setError(`Insufficient balance. You need at least ${formatSats(bid.amount)}`);
+          console.log('💰 Checking wallet balance...');
+          const balance = await nwc.getBalance();
+          const balanceSats = Math.floor(balance.balance / 1000);
+          console.log(`Wallet balance: ${balanceSats} sats, Required: ${bid.amount} sats`);
+
+          if (balanceSats < bid.amount) {
+            setError(`Insufficient balance. You have ${formatSats(balanceSats)} but need ${formatSats(bid.amount)}`);
             setLoading(false);
             return;
           }
@@ -564,7 +568,8 @@ export default function DeliveryApp() {
           console.log(`Would pay ${formatSats(bid.amount)} to escrow`);
         } catch (paymentErr) {
           console.error('Payment error:', paymentErr);
-          setError('Payment failed. Please check your wallet and try again.');
+          const errorMessage = paymentErr instanceof Error ? paymentErr.message : 'Unknown error';
+          setError(`Payment check failed: ${errorMessage}. Try disconnecting and reconnecting your wallet in Settings.`);
           setLoading(false);
           return;
         }
