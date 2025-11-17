@@ -9,10 +9,19 @@ import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 
 // Configure secp256k1 to use @noble/hashes for HMAC-SHA256
 // This is required for signing operations in @noble/secp256k1 v2.x
-(secp256k1.utils as any).hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]): Uint8Array => {
-  const h = hmac.create(nobleSha256, key);
-  messages.forEach(msg => h.update(msg));
-  return h.digest();
+// See: https://github.com/paulmillr/noble-secp256k1#usage
+(secp256k1.utils as any).hmacSha256 = (key: Uint8Array, ...messages: Uint8Array[]): Uint8Array => {
+  return hmac(nobleSha256, key, messages.length === 1 ? messages[0] : messages.reduce((acc, msg) => {
+    const combined = new Uint8Array(acc.length + msg.length);
+    combined.set(acc);
+    combined.set(msg, acc.length);
+    return combined;
+  }));
+};
+
+// Also configure sha256 for the library
+(secp256k1.utils as any).sha256 = (message: Uint8Array): Uint8Array => {
+  return nobleSha256(message);
 };
 
 // Export the configured secp256k1 instance for use throughout the application
