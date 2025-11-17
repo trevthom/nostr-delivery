@@ -1,5 +1,7 @@
 Peer-to-Peer Package/Passenger Delivery over Nostr
 
+
+
 TO DO ☐ ✔
 
 ☐ Enable NWC for Bitcoin 
