@@ -1,4 +1,4 @@
-# Peer-to-Peer Package/Passenger Delivery over Nostr
+# Peer-to-Peer Delivery/Transport over Nostr
 
 ## To run, use two terminal windows:
 1. 1st terminal - navigate to backend folder
