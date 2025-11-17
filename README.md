@@ -18,7 +18,7 @@ TO DO ☐ ✔
 
 ☐ Enable "Deliveries Completed" increment in Settings menu (not working)
 
-☐ Enable optional name/identifier instead of npub
+☐ Enable optional name/identifier in addition to npub
 
 ☐ Sending/Delivering address autocomplete?
 
