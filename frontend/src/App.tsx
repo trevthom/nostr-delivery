@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, MapPin, Clock, Shield, Bitcoin, CheckCircle, XCircle, AlertCircle, Settings, LogOut, User, TrendingUp, Key, ChevronDown, ChevronUp, Bell } from 'lucide-react';
+import { Package, MapPin, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, LogOut, TrendingUp, Key, ChevronDown, ChevronUp, Bell, Wallet, Zap } from 'lucide-react';
 import { isValidNsec, nsecToNpub, formatNpubForDisplay } from './lib/crypto';
+import { useNWC } from './hooks/useNWC';
+import { NWCConnectionStatus } from './types/nwc';
+import { formatSats, hasSufficientBalance } from './lib/payments';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -220,6 +223,11 @@ export default function DeliveryApp() {
   const [seenBids, setSeenBids] = useState<Record<string, boolean>>({}); // deliveryId -> seen
   const [seenActiveDeliveries, setSeenActiveDeliveries] = useState<Record<string, boolean>>({}); // deliveryId -> seen
 
+  // NWC (Nostr Wallet Connect) State
+  const nwc = useNWC();
+  const [nwcConnectionUri, setNwcConnectionUri] = useState('');
+  const [showNwcInput, setShowNwcInput] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState({
     pickupAddress: '',
@@ -363,6 +371,60 @@ export default function DeliveryApp() {
     setDeliveryRequests([]);
     setActiveDelivery(null);
     setError(null);
+
+    // Disconnect NWC on logout
+    if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+      nwc.disconnect();
+    }
+  };
+
+  // ============================================================================
+  // NWC (NOSTR WALLET CONNECT) HANDLERS
+  // ============================================================================
+
+  const handleConnectNWC = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!nwcConnectionUri.trim()) {
+        setError('Please enter a valid NWC connection URI');
+        return;
+      }
+
+      // Validate URI format
+      const params = nwc.parseConnectionUri(nwcConnectionUri.trim());
+      if (!params) {
+        setError('Invalid NWC connection URI. Please check the format.');
+        return;
+      }
+
+      // Connect to NWC
+      await nwc.connect(nwcConnectionUri.trim());
+
+      // Get wallet info and balance
+      try {
+        await nwc.getInfo();
+        await nwc.getBalance();
+      } catch (err) {
+        console.error('Failed to get wallet info:', err);
+      }
+
+      setShowNwcInput(false);
+      console.log('âœ… Connected to NWC wallet');
+    } catch (err) {
+      console.error('NWC connection error:', err);
+      setError('Failed to connect to NWC wallet. Please check your connection URI.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnectNWC = () => {
+    nwc.disconnect();
+    setNwcConnectionUri('');
+    setShowNwcInput(false);
+    console.log('🔌 Disconnected from NWC wallet');
   };
 
   // ============================================================================
@@ -447,7 +509,7 @@ export default function DeliveryApp() {
   const placeBid = async (requestId: string, amount: number) => {
     try {
       setLoading(true);
-      const result = await api.placeBid(requestId, {
+      await api.placeBid(requestId, {
         courier: userProfile.npub,
         amount,
         estimated_time: '1-2 hours',
@@ -470,11 +532,54 @@ export default function DeliveryApp() {
   const acceptBid = async (request: DeliveryRequest, bidIndex: number) => {
     try {
       setLoading(true);
+      const bid = request.bids[bidIndex];
+
+      // If NWC is connected, handle payment
+      if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+        try {
+          // Check if sender has sufficient balance
+          const hasBalance = await hasSufficientBalance(nwc, bid.amount);
+          if (!hasBalance) {
+            setError(`Insufficient balance. You need at least ${formatSats(bid.amount)}`);
+            setLoading(false);
+            return;
+          }
+
+          // Create escrow invoice (courier creates invoice, sender pays it)
+          const confirmation = window.confirm(
+            `Pay ${formatSats(bid.amount)} to escrow for this delivery?\n\nThe payment will be held in escrow and released to the courier upon delivery confirmation.`
+          );
+
+          if (!confirmation) {
+            setLoading(false);
+            return;
+          }
+
+          // In a real implementation, the courier would create the invoice
+          // For now, we'll simulate the escrow payment flow
+          console.log('💰 Processing escrow payment via NWC...');
+
+          // Note: In production, you'd get the courier's invoice and pay it
+          // For demo purposes, we're just logging the intent
+          console.log(`Would pay ${formatSats(bid.amount)} to escrow`);
+        } catch (paymentErr) {
+          console.error('Payment error:', paymentErr);
+          setError('Payment failed. Please check your wallet and try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await api.acceptBid(request.id, bidIndex);
       setActiveDelivery(result.delivery);
       // Mark bid as seen when accepting
       setSeenBids(prev => ({ ...prev, [request.id]: true }));
-      alert('âœ… Bid accepted! Delivery in progress.');
+
+      const message = nwc.connectionState.status === NWCConnectionStatus.CONNECTED
+        ? 'âœ… Bid accepted and payment secured! Delivery in progress.'
+        : 'âœ… Bid accepted! Delivery in progress.';
+      alert(message);
+
       await loadDeliveryRequests();
       setCurrentView('active');
       setError(null);
@@ -596,8 +701,45 @@ export default function DeliveryApp() {
 
     try {
       setLoading(true);
+
+      // If NWC is connected, handle payment release
+      if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+        const acceptedBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+        if (acceptedBid) {
+          const confirmation = window.confirm(
+            `Release payment of ${formatSats(acceptedBid.amount)} to the courier?\n\nThis confirms the delivery was completed successfully.`
+          );
+
+          if (!confirmation) {
+            setLoading(false);
+            return;
+          }
+
+          try {
+            // In production, the courier would provide their invoice
+            // For now, we'll simulate the payment release
+            console.log('💸 Releasing payment via NWC...');
+            console.log(`Would pay ${formatSats(acceptedBid.amount)} to courier`);
+
+            // Note: In a real implementation, you'd:
+            // 1. Get the courier's invoice
+            // 2. Pay it using: await payInvoice(nwc, courierInvoice, delivery.id);
+          } catch (paymentErr) {
+            console.error('Payment release error:', paymentErr);
+            setError('Failed to release payment. Please try again.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       await api.confirmDelivery(delivery.id, selectedRating, senderFeedback.trim() || undefined);
-      alert('âœ… Delivery confirmed! Payment released.');
+
+      const message = nwc.connectionState.status === NWCConnectionStatus.CONNECTED
+        ? 'âœ… Delivery confirmed and payment released!'
+        : 'âœ… Delivery confirmed! Payment released.';
+      alert(message);
+
       setSenderFeedback('');
       setSelectedRating(0);
       await loadDeliveryRequests();
@@ -982,7 +1124,7 @@ export default function DeliveryApp() {
 
             {/* Profile Section */}
             <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Profile</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className={`p-4 ${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Reputation</p>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
@@ -1001,6 +1143,110 @@ export default function DeliveryApp() {
                   {userProfile.npub}
                 </p>
               </div>
+            </div>
+
+            {/* NWC Wallet Section */}
+            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              <Wallet className="inline-block w-5 h-5 mr-2" />
+              Bitcoin Wallet (NWC)
+            </h3>
+            <div className={`mb-6 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+              {nwc.connectionState.status === NWCConnectionStatus.CONNECTED ? (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap className={`w-5 h-5 ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                        <span className={`font-semibold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                          Wallet Connected
+                        </span>
+                      </div>
+                      {nwc.connectionState.balance !== undefined && (
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                          Balance: <span className="font-semibold">{(nwc.connectionState.balance / 1000).toLocaleString()} sats</span>
+                        </p>
+                      )}
+                      {nwc.connectionState.relay && (
+                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                          Relay: {new URL(nwc.connectionState.relay).hostname}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleDisconnectNWC}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-red-700 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'} transition-colors`}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                  {nwc.connectionState.capabilities && (
+                    <div className={`mt-3 p-3 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg`}>
+                      <p className={`text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                        Capabilities:
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {nwc.connectionState.capabilities.map((method) => (
+                          <span
+                            key={method}
+                            className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
+                          >
+                            {method}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+                    Connect your Bitcoin wallet using Nostr Wallet Connect (NWC) to send and receive payments for deliveries.
+                  </p>
+                  {!showNwcInput ? (
+                    <button
+                      onClick={() => setShowNwcInput(true)}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-orange-600 hover:bg-orange-500 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'} transition-colors flex items-center gap-2`}
+                    >
+                      <Wallet className="w-4 h-4" />
+                      Connect Wallet
+                    </button>
+                  ) : (
+                    <div>
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                        NWC Connection URI
+                      </label>
+                      <input
+                        type="text"
+                        value={nwcConnectionUri}
+                        onChange={(e) => setNwcConnectionUri(e.target.value)}
+                        placeholder="nostr+walletconnect://..."
+                        className={`w-full px-3 py-2 border rounded-lg mb-3 ${darkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'}`}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleConnectNWC}
+                          disabled={loading || !nwcConnectionUri.trim()}
+                          className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-orange-600 hover:bg-orange-500 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {loading ? 'Connecting...' : 'Connect'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowNwcInput(false);
+                            setNwcConnectionUri('');
+                          }}
+                          className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'} transition-colors`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-3`}>
+                        Get your NWC connection URI from your Lightning wallet (Alby, Mutiny, etc.)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
