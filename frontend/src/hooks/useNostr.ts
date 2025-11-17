@@ -30,12 +30,6 @@ interface UseNostrReturn {
   signEvent: (event: NostrEvent) => Promise<NostrEvent | null>;
 }
 
-const RELAYS = [
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.nostr.band'
-];
-
 export function useNostr(): UseNostrReturn {
   const [connected, setConnected] = useState(false);
   const [publicKey, setPublicKey] = useState<string | null>(null);
@@ -123,7 +117,7 @@ export function useNostr(): UseNostrReturn {
   // Subscribe to events from relays
   const subscribeToEvents = useCallback((
     filters: NostrFilter,
-    onEvent: (event: NostrEvent) => void
+    _onEvent: (event: NostrEvent) => void
   ): (() => void) => {
     // In production, this would subscribe to actual relay events
     console.log('📥 Subscribing to events:', filters);
