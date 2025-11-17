@@ -278,62 +278,70 @@ export function useNWC(): UseNWCReturn {
         relay: params.relay,
       });
 
-      try {
-        // Connect to relay
-        const ws = new WebSocket(params.relay);
+      // Return a Promise that resolves when WebSocket opens
+      return new Promise<void>((resolve, reject) => {
+        try {
+          // Connect to relay
+          const ws = new WebSocket(params.relay);
 
-        ws.onopen = () => {
-          console.log('✅ Connected to NWC relay:', params.relay);
+          ws.onopen = () => {
+            console.log('✅ Connected to NWC relay:', params.relay);
 
-          // Subscribe to response and notification events from wallet
-          const subscriptionId = 'nwc_' + Math.random().toString(36).substring(7);
-          subscriptionIdRef.current = subscriptionId;
+            // Subscribe to response and notification events from wallet
+            const subscriptionId = 'nwc_' + Math.random().toString(36).substring(7);
+            subscriptionIdRef.current = subscriptionId;
 
-          const filter = {
-            kinds: [NWCEventKind.RESPONSE, NWCEventKind.NOTIFICATION, NWCEventKind.INFO],
-            authors: [params.walletPubkey],
-            '#p': [secp256k1.getPublicKey(params.secret, true).slice(1).reduce(
-              (hex, byte) => hex + byte.toString(16).padStart(2, '0'),
-              ''
-            )],
+            const filter = {
+              kinds: [NWCEventKind.RESPONSE, NWCEventKind.NOTIFICATION, NWCEventKind.INFO],
+              authors: [params.walletPubkey],
+              '#p': [secp256k1.getPublicKey(params.secret, true).slice(1).reduce(
+                (hex, byte) => hex + byte.toString(16).padStart(2, '0'),
+                ''
+              )],
+            };
+
+            ws.send(JSON.stringify(['REQ', subscriptionId, filter]));
+
+            connectionParamsRef.current = params;
+            wsRef.current = ws;
+            setConnectionState({
+              status: NWCConnectionStatus.CONNECTED,
+              walletPubkey: params.walletPubkey,
+              relay: params.relay,
+            });
+
+            // Resolve the Promise after connection is established
+            resolve();
           };
 
-          ws.send(JSON.stringify(['REQ', subscriptionId, filter]));
+          ws.onmessage = handleMessage;
 
-          connectionParamsRef.current = params;
-          setConnectionState({
-            status: NWCConnectionStatus.CONNECTED,
-            walletPubkey: params.walletPubkey,
-            relay: params.relay,
-          });
-        };
+          ws.onerror = (error) => {
+            console.error('❌ NWC WebSocket error:', error);
+            setConnectionState({
+              status: NWCConnectionStatus.ERROR,
+              error: 'WebSocket connection error',
+            });
+            // Reject the Promise on connection error
+            reject(new Error('WebSocket connection error'));
+          };
 
-        ws.onmessage = handleMessage;
-
-        ws.onerror = (error) => {
-          console.error('❌ NWC WebSocket error:', error);
+          ws.onclose = () => {
+            console.log('🔌 Disconnected from NWC relay');
+            setConnectionState({
+              status: NWCConnectionStatus.DISCONNECTED,
+            });
+          };
+        } catch (error) {
+          console.error('Failed to connect to NWC:', error);
           setConnectionState({
             status: NWCConnectionStatus.ERROR,
-            error: 'WebSocket connection error',
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
-        };
-
-        ws.onclose = () => {
-          console.log('🔌 Disconnected from NWC relay');
-          setConnectionState({
-            status: NWCConnectionStatus.DISCONNECTED,
-          });
-        };
-
-        wsRef.current = ws;
-      } catch (error) {
-        console.error('Failed to connect to NWC:', error);
-        setConnectionState({
-          status: NWCConnectionStatus.ERROR,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        throw error;
-      }
+          // Reject the Promise on error
+          reject(error);
+        }
+      });
     },
     [parseConnectionUri, handleMessage]
   );
