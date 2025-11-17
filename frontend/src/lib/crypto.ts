@@ -1,9 +1,19 @@
 // frontend/src/lib/crypto.ts
 import * as secp256k1 from '@noble/secp256k1';
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 
 /**
  * Cryptography utility functions for Nostr
  */
+
+// Configure secp256k1 to use @noble/hashes for HMAC-SHA256
+// This is required for signing operations in @noble/secp256k1 v2.x
+(secp256k1.utils as any).hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]): Uint8Array => {
+  const h = hmac.create(nobleSha256, key);
+  messages.forEach(msg => h.update(msg));
+  return h.digest();
+};
 
 /**
  * Generate random hex string
