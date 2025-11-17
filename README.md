@@ -7,7 +7,7 @@
     - npm install
     - npm run dev
 3. Open the link
-4. Login with nsec (nostrtools.com if you want a general one)
+4. Login with nsec (nostrtool.com if you want a general one)
 
 ## TO DO ☐ ✔
 
