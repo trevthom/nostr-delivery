@@ -1,10 +1,17 @@
-Peer-to-Peer Package/Passenger Delivery over Nostr
+# Peer-to-Peer Package/Passenger Delivery over Nostr
 
+## To run, use two terminal windows:
+1. 1st terminal - navigate to backend folder
+    - cargo run --release
+2. 2nd terminal - navigate to frontend folder
+    - npm install
+    - npm run dev
+3. Open the link
+4. Login with nsec (nostrtools.com if you want a general one)
 
+## TO DO ☐ ✔
 
-TO DO ☐ ✔
-
-☐ Enable NWC for Bitcoin 
+☐ Enable NWC for Bitcoin (not fully working)
 
 ☐ Disable 10 second refresh (moves screen)
 
