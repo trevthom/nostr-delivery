@@ -3,7 +3,7 @@ import { Package, MapPin, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, Lo
 import { isValidNsec, nsecToNpub, formatNpubForDisplay } from './lib/crypto';
 import { useNWC } from './hooks/useNWC';
 import { NWCConnectionStatus } from './types/nwc';
-import { formatSats, hasSufficientBalance } from './lib/payments';
+import { formatSats, hasSufficientBalance, estimateTotalCost } from './lib/payments';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -537,10 +537,11 @@ export default function DeliveryApp() {
       // If NWC is connected, handle payment
       if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
         try {
-          // Check if sender has sufficient balance
-          const hasBalance = await hasSufficientBalance(nwc, bid.amount);
+          // Check if sender has sufficient balance (including estimated fees)
+          const totalCost = estimateTotalCost(bid.amount);
+          const hasBalance = await hasSufficientBalance(nwc, totalCost);
           if (!hasBalance) {
-            setError(`Insufficient balance. You need at least ${formatSats(bid.amount)}`);
+            setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
             setLoading(false);
             return;
           }
