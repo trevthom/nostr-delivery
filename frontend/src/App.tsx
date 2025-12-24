@@ -203,9 +203,11 @@ export default function DeliveryApp() {
   const [editingDelivery, setEditingDelivery] = useState<DeliveryRequest | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [seenCompletedDeliveries, setSeenCompletedDeliveries] = useState<Set<string>>(new Set());
+  const [courierProfiles, setCourierProfiles] = useState<Map<string, UserProfile>>(new Map());
 
   // Refs
   const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -281,7 +283,12 @@ export default function DeliveryApp() {
   // Close settings when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(event.target as Node) &&
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target as Node)
+      ) {
         setShowSettings(false);
       }
     };
@@ -293,6 +300,22 @@ export default function DeliveryApp() {
       };
     }
   }, [showSettings]);
+
+  // Fetch courier profiles for completed deliveries
+  useEffect(() => {
+    if (currentView === 'confirmed' || currentView === 'completed') {
+      const fetchProfiles = async () => {
+        const completedDeliveries = deliveryRequests.filter(r => r.status === 'confirmed');
+        for (const delivery of completedDeliveries) {
+          const courierBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+          if (courierBid && !courierProfiles.has(courierBid.courier)) {
+            await fetchCourierProfile(courierBid.courier);
+          }
+        }
+      };
+      fetchProfiles();
+    }
+  }, [currentView, deliveryRequests]);
 
   // ============================================================================
   // CONNECTION HANDLERS
@@ -473,13 +496,47 @@ export default function DeliveryApp() {
     }
   };
 
-  const createDeliveryRequest = async () => {
+  // Fetch current courier profile
+  const fetchCourierProfile = async (npub: string): Promise<UserProfile | null> => {
     try {
+      // Check cache first
+      if (courierProfiles.has(npub)) {
+        return courierProfiles.get(npub)!;
+      }
+
+      // Fetch from API
+      const profile = await api.getUser(npub);
+
+      // Update cache
+      setCourierProfiles(prev => new Map(prev).set(npub, profile));
+
+      return profile;
+    } catch (err) {
+      console.error('Failed to fetch courier profile:', err);
+      return null;
+    }
+  };
+
+  const createDeliveryRequest = async () => {
+    try{
       const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate } = formData;
-      
+
       if (!pickupAddress || !dropoffAddress || !offerAmount) {
         setError('Please fill in all required fields');
         return;
+      }
+
+      // Validate wallet balance if NWC is connected
+      if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+        const offerAmountSats = parseInt(offerAmount);
+        const totalCost = estimateTotalCost(offerAmountSats);
+        const hasBalance = await hasSufficientBalance(nwc, totalCost);
+
+        if (!hasBalance) {
+          const currentBalance = nwc.connectionState.balance || 0;
+          setError(`Insufficient balance. You have ${formatSats(currentBalance)} but need ${formatSats(totalCost)} (${formatSats(offerAmountSats)} + ~1% fees)`);
+          return;
+        }
       }
 
       setLoading(true);
@@ -684,14 +741,56 @@ export default function DeliveryApp() {
   };
 
   const cancelDeliveryJob = async (deliveryId: string) => {
-    if (!confirm('Are you sure you want to cancel this job? You will forfeit your sats to the courier.')) {
+    const delivery = deliveryRequests.find(r => r.id === deliveryId);
+    if (!delivery) {
+      setError('Delivery not found');
+      return;
+    }
+
+    const acceptedBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+    if (!acceptedBid) {
+      setError('No accepted bid found for this delivery');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to cancel this job? You will forfeit ${formatSats(acceptedBid.amount)} to the courier.`)) {
       return;
     }
 
     try {
       setLoading(true);
+
+      // If NWC is connected, handle forfeit payment to courier
+      if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+        const totalCost = estimateTotalCost(acceptedBid.amount);
+        const hasBalance = await hasSufficientBalance(nwc, totalCost);
+
+        if (!hasBalance) {
+          const currentBalance = nwc.connectionState.balance || 0;
+          setError(`Insufficient balance to forfeit. You have ${formatSats(currentBalance)} but need ${formatSats(totalCost)} (${formatSats(acceptedBid.amount)} + ~1% fees)`);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          console.log('💸 Forfeiting payment to courier via NWC...');
+          console.log(`Would pay ${formatSats(acceptedBid.amount)} to courier ${acceptedBid.courier}`);
+
+          // Note: In a real implementation, you'd:
+          // 1. Get the courier's Lightning invoice
+          // 2. Pay it using: await payInvoice(nwc, courierInvoice, deliveryId);
+          // OR use keysend if the courier's Lightning pubkey is known:
+          // await sendKeysendPayment(nwc, courierLightningPubkey, acceptedBid.amount, deliveryId);
+        } catch (paymentErr) {
+          console.error('Payment error:', paymentErr);
+          setError('Failed to process forfeit payment. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
       await api.cancelDelivery(deliveryId);
-      alert('âš ï¸ Job cancelled. Sats forfeited to courier.');
+      alert(`âš ï¸ Job cancelled. ${formatSats(acceptedBid.amount)} forfeited to courier.`);
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -1044,6 +1143,7 @@ export default function DeliveryApp() {
             </div>
 
             <button
+              ref={settingsButtonRef}
               onClick={() => setShowSettings(!showSettings)}
               className={`p-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
             >
@@ -2145,7 +2245,13 @@ export default function DeliveryApp() {
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Delivered By</p>
                           <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{courierBid.courier}</p>
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {courierBid.reputation.toFixed(1)}⭐ • {courierBid.completed_deliveries} deliveries
+                            {(() => {
+                              const currentProfile = courierProfiles.get(courierBid.courier);
+                              if (currentProfile) {
+                                return `${currentProfile.reputation.toFixed(1)}⭐ • ${currentProfile.completed_deliveries} deliveries`;
+                              }
+                              return `${courierBid.reputation.toFixed(1)}⭐ • ${courierBid.completed_deliveries} deliveries`;
+                            })()}
                           </p>
                         </div>
                       )}

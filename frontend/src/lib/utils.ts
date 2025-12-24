@@ -26,11 +26,15 @@ export function btcToSats(btc: number): number {
  */
 export function formatDate(timestamp: number): string {
   const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString('en-US', {
+  const dateStr = date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
   });
+  const timezone = date.toLocaleTimeString('en-US', {
+    timeZoneName: 'short'
+  }).split(' ').pop();
+  return `${dateStr} ${timezone}`;
 }
 
 /**
@@ -38,13 +42,17 @@ export function formatDate(timestamp: number): string {
  */
 export function formatDateTime(timestamp: number): string {
   const date = new Date(timestamp * 1000);
-  return date.toLocaleString('en-US', {
+  const dateTimeStr = date.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   });
+  const timezone = date.toLocaleTimeString('en-US', {
+    timeZoneName: 'short'
+  }).split(' ').pop();
+  return `${dateTimeStr} ${timezone}`;
 }
 
 /**
