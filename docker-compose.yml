@@ -11,6 +11,7 @@ services:
       - "8080:8080"
     environment:
       - RUST_LOG=info
+      - NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band
     restart: unless-stopped
     networks:
       - delivery-network
