@@ -48,9 +48,9 @@ You can add more relays for improved redundancy and availability.
 
 ☐ Add unique identifiers to deliveries
 
-☐ Enable Reputation Score (not working)
+✔ Enable Reputation Score
 
-☐ Enable "Deliveries Completed" increment in Settings menu (not working)
+✔ Enable "Deliveries Completed" increment in Settings menu
 
 ☐ Enable optional name/identifier in addition to npub
 
@@ -69,3 +69,10 @@ You can add more relays for improved redundancy and availability.
 ☐ Enable automated routing for longer deliveries
 
 ☐ Enable "hubs" alongside automated routing
+
+☐ Enable escrow mechanism
+
+☐ Enable local timezones
+
+☐ Add unique delivery identifiers (hash?)
+
