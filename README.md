@@ -40,7 +40,7 @@ You can add more relays for improved redundancy and availability.
 
 ☐ Enable NWC for Bitcoin (not fully working)
 
-☐ Disable 10 second refresh (moves screen)
+✔ Disable 10 second refresh (moves screen)
 
 ☐ Demo Mode should be a read-only view
 
@@ -60,7 +60,7 @@ You can add more relays for improved redundancy and availability.
 
 ☐ Enable encrypted chat between sender/courier
 
-☐ Add taxi wording/options for transporting persons
+✔ Add taxi wording/options for transporting persons
 
 ☐ Enable optional GPS tracking of courier
 
