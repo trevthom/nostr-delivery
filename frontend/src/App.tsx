@@ -87,6 +87,22 @@ enum UserMode {
 }
 
 // ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+// Format date with timezone
+const formatDateWithTimezone = (date: Date): string => {
+  return date.toLocaleDateString();
+};
+
+// Format time with timezone (3-letter format)
+const formatTimeWithTimezone = (date: Date): string => {
+  const timeString = date.toLocaleTimeString();
+  const timezone = date.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
+  return `${timeString} ${timezone}`;
+};
+
+// ============================================================================
 // API CLIENT
 // ============================================================================
 
@@ -206,6 +222,7 @@ export default function DeliveryApp() {
 
   // Refs
   const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -225,6 +242,9 @@ export default function DeliveryApp() {
   // Bid/delivery seen tracking
   const [seenBids, setSeenBids] = useState<Record<string, boolean>>({}); // deliveryId -> seen
   const [seenActiveDeliveries, setSeenActiveDeliveries] = useState<Record<string, boolean>>({}); // deliveryId -> seen
+
+  // Courier profiles cache (for displaying current stats in completed deliveries)
+  const [courierProfiles, setCourierProfiles] = useState<Record<string, UserProfile>>({});
 
   // NWC (Nostr Wallet Connect) State
   const nwc = useNWC();
@@ -281,7 +301,8 @@ export default function DeliveryApp() {
   // Close settings when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node) &&
+          settingsButtonRef.current && !settingsButtonRef.current.contains(event.target as Node)) {
         setShowSettings(false);
       }
     };
@@ -464,6 +485,38 @@ export default function DeliveryApp() {
         }
       }
 
+      // Fetch courier profiles for completed deliveries to show current stats
+      const completedDeliveries = requests.filter(r =>
+        (r.status === 'confirmed' || r.status === 'completed') && r.accepted_bid
+      );
+      const courierNpubs = new Set<string>();
+      completedDeliveries.forEach(delivery => {
+        const courierBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+        if (courierBid) {
+          courierNpubs.add(courierBid.courier);
+        }
+      });
+
+      // Fetch profiles for all couriers
+      const profilePromises = Array.from(courierNpubs).map(async (npub) => {
+        try {
+          const profile = await api.getUser(npub);
+          return { npub, profile };
+        } catch (err) {
+          console.error(`Failed to fetch profile for ${npub}:`, err);
+          return null;
+        }
+      });
+
+      const profiles = await Promise.all(profilePromises);
+      const profilesMap: Record<string, UserProfile> = {};
+      profiles.forEach(result => {
+        if (result) {
+          profilesMap[result.npub] = result.profile;
+        }
+      });
+      setCourierProfiles(profilesMap);
+
       setError(null);
     } catch (err) {
       setError('Failed to load deliveries');
@@ -476,10 +529,21 @@ export default function DeliveryApp() {
   const createDeliveryRequest = async () => {
     try {
       const { pickupAddress, dropoffAddress, packages, offerAmount, insuranceAmount, timeWindow, customDate } = formData;
-      
+
       if (!pickupAddress || !dropoffAddress || !offerAmount) {
         setError('Please fill in all required fields');
         return;
+      }
+
+      // Validate wallet balance if NWC is connected
+      if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
+        const requestedAmount = parseInt(offerAmount);
+        const totalCost = estimateTotalCost(requestedAmount);
+        const hasBalance = await hasSufficientBalance(nwc, totalCost);
+        if (!hasBalance) {
+          setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+          return;
+        }
       }
 
       setLoading(true);
@@ -684,14 +748,30 @@ export default function DeliveryApp() {
   };
 
   const cancelDeliveryJob = async (deliveryId: string) => {
-    if (!confirm('Are you sure you want to cancel this job? You will forfeit your sats to the courier.')) {
+    const delivery = deliveryRequests.find(r => r.id === deliveryId);
+    if (!delivery) {
+      setError('Delivery not found');
+      return;
+    }
+
+    const confirmedAmount = delivery.agreed_amount || delivery.offer_amount;
+
+    if (!confirm(`Are you sure you want to cancel this job?\n\nYou will forfeit ${formatSats(confirmedAmount)} to the courier.\n\nThis action cannot be undone.`)) {
       return;
     }
 
     try {
       setLoading(true);
+
+      // Cancel the delivery (backend updates courier's total_earnings)
       await api.cancelDelivery(deliveryId);
-      alert('âš ï¸ Job cancelled. Sats forfeited to courier.');
+
+      // Note: In a full implementation with escrow, the escrowed sats would be automatically
+      // released to the courier here via Lightning payment. For now, the backend tracks
+      // the forfeiture by updating the courier's total_earnings.
+      console.log(`💰 Forfeited ${formatSats(confirmedAmount)} to courier (tracked in backend)`);
+
+      alert(`âš ï¸ Job cancelled.\n\nThe courier has been credited ${formatSats(confirmedAmount)} for the cancellation.`);
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -1044,6 +1124,7 @@ export default function DeliveryApp() {
             </div>
 
             <button
+              ref={settingsButtonRef}
               onClick={() => setShowSettings(!showSettings)}
               className={`p-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
             >
@@ -1622,14 +1703,14 @@ export default function DeliveryApp() {
               </div>
             ) : userMode === UserMode.SENDER ? (
               // Show sender's requests with bids (excluding only confirmed, keep completed for review)
-              deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed').length === 0 ? (
+              deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed' && r.status !== 'expired' && r.status !== 'cancelled').length === 0 ? (
                 <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                   <AlertCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
                   <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No requests yet. Create one to get started!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed').map(request => (
+                  {deliveryRequests.filter(r => r.sender === userProfile.npub && r.status !== 'confirmed' && r.status !== 'expired' && r.status !== 'cancelled').map(request => (
                     <div key={request.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}` }>
@@ -2092,11 +2173,11 @@ export default function DeliveryApp() {
                             <>
                               <div>
                                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
-                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDateWithTimezone(completedDate)}</p>
                               </div>
                               <div>
                                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
-                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatTimeWithTimezone(completedDate)}</p>
                               </div>
                             </>
                           )}
@@ -2117,11 +2198,11 @@ export default function DeliveryApp() {
                               <>
                                 <div>
                                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
-                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDateWithTimezone(completedDate)}</p>
                                 </div>
                                 <div>
                                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
-                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatTimeWithTimezone(completedDate)}</p>
                                 </div>
                               </>
                             )}
@@ -2145,7 +2226,11 @@ export default function DeliveryApp() {
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Delivered By</p>
                           <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{courierBid.courier}</p>
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {courierBid.reputation.toFixed(1)}⭐ • {courierBid.completed_deliveries} deliveries
+                            {courierProfiles[courierBid.courier] ? (
+                              <>{courierProfiles[courierBid.courier].reputation.toFixed(1)}⭐ • {courierProfiles[courierBid.courier].completed_deliveries} deliveries</>
+                            ) : (
+                              <>{courierBid.reputation.toFixed(1)}⭐ • {courierBid.completed_deliveries} deliveries</>
+                            )}
                           </p>
                         </div>
                       )}
@@ -2253,11 +2338,11 @@ export default function DeliveryApp() {
                             <>
                               <div>
                                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
-                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDateWithTimezone(completedDate)}</p>
                               </div>
                               <div>
                                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
-                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatTimeWithTimezone(completedDate)}</p>
                               </div>
                             </>
                           )}
@@ -2284,11 +2369,11 @@ export default function DeliveryApp() {
                               <>
                                 <div>
                                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Date Completed</p>
-                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleDateString()}</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDateWithTimezone(completedDate)}</p>
                                 </div>
                                 <div>
                                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Time Completed</p>
-                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{completedDate.toLocaleTimeString()}</p>
+                                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatTimeWithTimezone(completedDate)}</p>
                                 </div>
                               </>
                             )}
