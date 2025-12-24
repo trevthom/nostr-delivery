@@ -127,6 +127,18 @@ pub fn calculate_new_reputation(old_rep: f32, rating: f32) -> f32 {
     target - (target - old_rep) * decay + (rating - old_rep) * (1.0 - decay)
 }
 
-// In-memory storage
+// Delivery Update structure for status changes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryUpdate {
+    pub status: DeliveryStatus,
+    pub timestamp: i64,
+    pub proof_of_delivery: Option<ProofOfDelivery>,
+    pub completed_at: Option<i64>,
+    pub accepted_bid: Option<String>,
+    pub sender_rating: Option<f32>,
+    pub sender_feedback: Option<String>,
+}
+
+// In-memory storage (deprecated - using Nostr)
 pub type Storage = HashMap<String, DeliveryRequest>;
 pub type UserStorage = HashMap<String, UserProfile>;
