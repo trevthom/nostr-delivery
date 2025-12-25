@@ -1099,7 +1099,7 @@ export default function DeliveryApp() {
               <div>
                 <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nostr Delivery</h1>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {authType === 'nsec' ? formatNpubForDisplay(userProfile.npub) : 'Demo Mode'}
+                  {authType === 'nsec' ? (userProfile.display_name ? `${userProfile.display_name} (${userProfile.npub})` : userProfile.npub) : 'Demo Mode'}
                 </p>
               </div>
             </div>
@@ -1323,7 +1323,17 @@ export default function DeliveryApp() {
 
             {/* Profile Section */}
             <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Profile</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className={`p-4 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Username</p>
+                <input
+                  type="text"
+                  value={userProfile.display_name || ''}
+                  onChange={(e) => setUserProfile({ ...userProfile, display_name: e.target.value })}
+                  placeholder="Optional"
+                  className={`w-full text-sm font-medium ${darkMode ? 'bg-purple-800 text-purple-300 placeholder-purple-500' : 'bg-white text-purple-600 placeholder-purple-400'} border ${darkMode ? 'border-purple-700' : 'border-purple-300'} rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                />
+              </div>
               <div className={`p-4 ${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Reputation</p>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
@@ -1339,7 +1349,7 @@ export default function DeliveryApp() {
               <div className={`p-4 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>ID</p>
                 <p className={`text-xs font-mono ${darkMode ? 'text-blue-400' : 'text-blue-600'} truncate`}>
-                  {userProfile.npub}
+                  {userProfile.display_name ? `${userProfile.display_name} (${userProfile.npub})` : userProfile.npub}
                 </p>
               </div>
             </div>
@@ -1353,13 +1363,20 @@ export default function DeliveryApp() {
           {userMode === UserMode.SENDER && (
             <button
               onClick={() => {
+                if (authType === 'demo') {
+                  alert('Demo Mode is read-only. Please sign in with a private key to create requests.');
+                  return;
+                }
                 setCurrentView('create');
                 loadDeliveryRequests();
               }}
+              disabled={authType === 'demo'}
               className={`px-6 py-3 font-medium transition-colors ${
-                currentView === 'create'
-                  ? 'border-b-2 border-orange-500 text-orange-600'
-                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                authType === 'demo'
+                  ? 'opacity-50 cursor-not-allowed text-gray-400'
+                  : currentView === 'create'
+                    ? 'border-b-2 border-orange-500 text-orange-600'
+                    : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Create Request
@@ -1660,8 +1677,14 @@ export default function DeliveryApp() {
                       return (
                         <>
                           <button
-                            onClick={() => !hasBid && placeBid(request.id, request.offer_amount)}
-                            disabled={loading || hasBid}
+                            onClick={() => {
+                              if (authType === 'demo') {
+                                alert('Demo Mode is read-only. Please sign in with a private key to accept delivery jobs.');
+                                return;
+                              }
+                              !hasBid && placeBid(request.id, request.offer_amount);
+                            }}
+                            disabled={loading || hasBid || authType === 'demo'}
                             className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
                           >
                             {hasBid
@@ -1671,11 +1694,15 @@ export default function DeliveryApp() {
                           </button>
                           <button
                             onClick={() => {
+                              if (authType === 'demo') {
+                                alert('Demo Mode is read-only. Please sign in with a private key to place bids.');
+                                return;
+                              }
                               const counterOffer = prompt('Enter your counter-offer (sats):');
                               if (counterOffer) placeBid(request.id, parseInt(counterOffer));
                             }}
-                            disabled={loading}
-                            className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors"
+                            disabled={loading || authType === 'demo'}
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
                           >
                             Counter Offer
                           </button>
@@ -1814,9 +1841,15 @@ export default function DeliveryApp() {
                                   </p>
                                 </div>
                                 <button
-                                  onClick={() => acceptBid(request, idx)}
-                                  disabled={loading}
-                                  className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                  onClick={() => {
+                                    if (authType === 'demo') {
+                                      alert('Demo Mode is read-only. Please sign in with a private key to accept bids.');
+                                      return;
+                                    }
+                                    acceptBid(request, idx);
+                                  }}
+                                  disabled={loading || authType === 'demo'}
+                                  className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
                                 >
                                   Accept
                                 </button>
