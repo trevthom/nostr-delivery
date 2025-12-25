@@ -401,10 +401,8 @@ export default function DeliveryApp() {
     setActiveDelivery(null);
     setError(null);
 
-    // Disconnect NWC on logout
-    if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
-      nwc.disconnect();
-    }
+    // Note: NWC wallet connection persists across logout
+    // Users must explicitly click "Disconnect" to disconnect their wallet
   };
 
   // ============================================================================
@@ -973,11 +971,11 @@ export default function DeliveryApp() {
           {/* Login Mode Tabs */}
           <div className={`flex gap-2 mb-6 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
             <button
-              onClick={() => setLoginMode('demo')}
-              className={`flex-1 px-4 py-3 font-medium transition-colors ${
+              disabled
+              className={`flex-1 px-4 py-3 font-medium cursor-not-allowed opacity-50 ${
                 loginMode === 'demo'
-                  ? 'border-b-2 border-orange-500 text-orange-600'
-                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                  ? 'border-b-2 border-gray-400 text-gray-500'
+                  : darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}
             >
               Demo Mode
@@ -1393,7 +1391,7 @@ export default function DeliveryApp() {
                 : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            {userMode === UserMode.SENDER ? 'My Requests' : 'Active Deliveries'}
+            {userMode === UserMode.SENDER ? 'My Requests' : 'Active Transports'}
           </button>
           {userMode === UserMode.SENDER && (
             <button
@@ -1407,7 +1405,7 @@ export default function DeliveryApp() {
                   : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Completed Deliveries
+              Completed Requests
             </button>
           )}
           {userMode === UserMode.COURIER && (
@@ -1427,7 +1425,7 @@ export default function DeliveryApp() {
                   : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Completed Deliveries
+              Completed Transports
             </button>
           )}
         </div>
@@ -2129,7 +2127,7 @@ export default function DeliveryApp() {
         {/* CONFIRMED DELIVERIES VIEW (SENDER) */}
         {currentView === 'confirmed' && userMode === UserMode.SENDER && (
           <div>
-            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Deliveries</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Requests</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
@@ -2295,7 +2293,7 @@ export default function DeliveryApp() {
         {/* COMPLETED DELIVERIES VIEW (COURIER) */}
         {currentView === 'completed' && userMode === UserMode.COURIER && (
           <div>
-            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Deliveries</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Transports</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>

@@ -33,6 +33,8 @@ export interface UseNWCReturn {
   parseConnectionUri: (uri: string) => NWCConnectionParams | null;
 }
 
+const NWC_STORAGE_KEY = 'nwc_connection_uri';
+
 export function useNWC(): UseNWCReturn {
   const [connectionState, setConnectionState] = useState<NWCConnectionState>({
     status: NWCConnectionStatus.DISCONNECTED,
@@ -46,6 +48,7 @@ export function useNWC(): UseNWCReturn {
     timeout: number;
   }>>(new Map());
   const subscriptionIdRef = useRef<string | null>(null);
+  const connectionUriRef = useRef<string | null>(null);
 
   /**
    * Parse NWC connection URI
@@ -272,6 +275,14 @@ export function useNWC(): UseNWCReturn {
         throw new Error('Invalid NWC connection URI');
       }
 
+      // Save connection URI for persistence
+      connectionUriRef.current = connectionUri;
+      try {
+        localStorage.setItem(NWC_STORAGE_KEY, connectionUri);
+      } catch (error) {
+        console.warn('Failed to save NWC connection to localStorage:', error);
+      }
+
       setConnectionState({
         status: NWCConnectionStatus.CONNECTING,
         walletPubkey: params.walletPubkey,
@@ -369,6 +380,14 @@ export function useNWC(): UseNWCReturn {
 
     connectionParamsRef.current = null;
     subscriptionIdRef.current = null;
+    connectionUriRef.current = null;
+
+    // Clear persisted connection
+    try {
+      localStorage.removeItem(NWC_STORAGE_KEY);
+    } catch (error) {
+      console.warn('Failed to remove NWC connection from localStorage:', error);
+    }
 
     setConnectionState({
       status: NWCConnectionStatus.DISCONNECTED,
@@ -426,13 +445,43 @@ export function useNWC(): UseNWCReturn {
   }, [sendRequest]);
 
   /**
+   * Auto-restore connection from localStorage on mount
+   */
+  useEffect(() => {
+    const restoreConnection = async () => {
+      try {
+        const savedUri = localStorage.getItem(NWC_STORAGE_KEY);
+        if (savedUri && connectionState.status === NWCConnectionStatus.DISCONNECTED) {
+          console.log('🔄 Restoring NWC connection from localStorage');
+          await connect(savedUri);
+          console.log('✅ NWC connection restored');
+        }
+      } catch (error) {
+        console.error('Failed to restore NWC connection:', error);
+        // Clear invalid connection
+        localStorage.removeItem(NWC_STORAGE_KEY);
+      }
+    };
+
+    restoreConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount, connect is stable
+
+  /**
    * Cleanup on unmount
    */
   useEffect(() => {
     return () => {
-      disconnect();
+      // Only close WebSocket, but keep connection saved for next session
+      if (wsRef.current) {
+        if (subscriptionIdRef.current) {
+          wsRef.current.send(JSON.stringify(['CLOSE', subscriptionIdRef.current]));
+        }
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, [disconnect]);
+  }, []);
 
   return {
     connectionState,
