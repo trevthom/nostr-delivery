@@ -160,6 +160,16 @@ const api = {
     return response.json();
   },
 
+  updateUser: async (npub: string, data: any): Promise<any> => {
+    const response = await fetch(`${API_URL}/api/user/${npub}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to update user');
+    return response.json();
+  },
+
   updateDelivery: async (deliveryId: string, data: any): Promise<any> => {
     const response = await fetch(`${API_URL}/api/deliveries/${deliveryId}`, {
       method: 'PATCH',
@@ -264,11 +274,25 @@ export default function DeliveryApp() {
       fragile: false,
       requires_signature: false
     }] as PackageInfo[],
+    persons: {
+      adults: 1,
+      children: 0,
+      carSeatRequested: false,
+      luggage: {
+        hasLuggage: false,
+        dimensions: '',
+        weight: ''
+      }
+    },
     offerAmount: '',
     insuranceAmount: '',
     timeWindow: 'asap',
     customDate: ''
   });
+
+  // Request type checkboxes
+  const [isPackagesRequest, setIsPackagesRequest] = useState(false);
+  const [isPersonsRequest, setIsPersonsRequest] = useState(false);
 
   // ============================================================================
   // EFFECTS
@@ -315,6 +339,23 @@ export default function DeliveryApp() {
       };
     }
   }, [showSettings]);
+
+  // Auto-save username when settings menu closes
+  const prevShowSettings = useRef(showSettings);
+  useEffect(() => {
+    const saveUsername = async () => {
+      if (prevShowSettings.current === true && showSettings === false && isAuthenticated && userProfile.npub) {
+        try {
+          await api.updateUser(userProfile.npub, { display_name: userProfile.display_name });
+          console.log('✅ Username saved');
+        } catch (err) {
+          console.error('Failed to save username:', err);
+        }
+      }
+      prevShowSettings.current = showSettings;
+    };
+    saveUsername();
+  }, [showSettings, isAuthenticated, userProfile.npub, userProfile.display_name]);
 
   // ============================================================================
   // CONNECTION HANDLERS
@@ -534,21 +575,22 @@ export default function DeliveryApp() {
         return;
       }
 
-      // Validate wallet balance if NWC is connected
+      // Validate wallet balance if NWC is connected (skip for zero offers)
       if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
         const requestedAmount = parseInt(offerAmount);
-        const totalCost = estimateTotalCost(requestedAmount);
-        const hasBalance = await hasSufficientBalance(nwc, totalCost);
-        if (!hasBalance) {
-          const currentBalance = nwc.connectionState.balance !== undefined
-            ? formatSats(nwc.connectionState.balance)
-            : 'unknown';
-          setError(`Insufficient balance. Your current balance: ${currentBalance}. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
-          // Scroll to error banner
-          setTimeout(() => {
-            errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
-          return;
+
+        // Skip balance validation for zero offer amounts
+        if (requestedAmount > 0) {
+          const totalCost = estimateTotalCost(requestedAmount);
+          const hasBalance = await hasSufficientBalance(nwc, totalCost);
+          if (!hasBalance) {
+            setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+            // Scroll to error banner
+            setTimeout(() => {
+              errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+            return;
+          }
         }
       }
 
@@ -616,15 +658,15 @@ export default function DeliveryApp() {
       if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
         try {
           // Check if sender has sufficient balance (including estimated fees)
-          const totalCost = estimateTotalCost(bid.amount);
-          const hasBalance = await hasSufficientBalance(nwc, totalCost);
-          if (!hasBalance) {
-            const currentBalance = nwc.connectionState.balance !== undefined
-              ? formatSats(nwc.connectionState.balance)
-              : 'unknown';
-            setError(`Insufficient balance. Your current balance: ${currentBalance}. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
-            setLoading(false);
-            return;
+          // Skip balance validation for zero bid amounts
+          if (bid.amount > 0) {
+            const totalCost = estimateTotalCost(bid.amount);
+            const hasBalance = await hasSufficientBalance(nwc, totalCost);
+            if (!hasBalance) {
+              setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
+              setLoading(false);
+              return;
+            }
           }
 
           // Create escrow invoice (courier creates invoice, sender pays it)
@@ -724,6 +766,16 @@ export default function DeliveryApp() {
       dropoffAddress: delivery.dropoff.address,
       dropoffInstructions: delivery.dropoff.instructions || '',
       packages: delivery.packages,
+      persons: {
+        adults: 1,
+        children: 0,
+        carSeatRequested: false,
+        luggage: {
+          hasLuggage: false,
+          dimensions: '',
+          weight: ''
+        }
+      },
       offerAmount: delivery.offer_amount.toString(),
       insuranceAmount: delivery.insurance_amount?.toString() || '',
       timeWindow: delivery.time_window,
@@ -928,11 +980,23 @@ export default function DeliveryApp() {
         fragile: false,
         requires_signature: false
       }],
+      persons: {
+        adults: 1,
+        children: 0,
+        carSeatRequested: false,
+        luggage: {
+          hasLuggage: false,
+          dimensions: '',
+          weight: ''
+        }
+      },
       offerAmount: '',
       insuranceAmount: '',
       timeWindow: 'asap',
       customDate: ''
     });
+    setIsPackagesRequest(false);
+    setIsPersonsRequest(false);
   };
 
   const addPackage = () => {
@@ -1519,9 +1583,36 @@ export default function DeliveryApp() {
                 />
               </div>
 
+              {/* Request Type Selection */}
               <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Packages</label>
-                {formData.packages.map((pkg, index) => (
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Request Type *</label>
+                <div className="flex gap-6">
+                  <label className={`flex items-center gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <input
+                      type="checkbox"
+                      checked={isPackagesRequest}
+                      onChange={(e) => setIsPackagesRequest(e.target.checked)}
+                      className="rounded"
+                    />
+                    Packages
+                  </label>
+                  <label className={`flex items-center gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <input
+                      type="checkbox"
+                      checked={isPersonsRequest}
+                      onChange={(e) => setIsPersonsRequest(e.target.checked)}
+                      className="rounded"
+                    />
+                    Persons
+                  </label>
+                </div>
+              </div>
+
+              {/* Packages Section */}
+              {isPackagesRequest && (
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Packages</label>
+                  {formData.packages.map((pkg, index) => (
                   <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 mb-3`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Package {index + 1}</span>
@@ -1570,11 +1661,83 @@ export default function DeliveryApp() {
                       </label>
                     </div>
                   </div>
-                ))}
-                <button onClick={addPackage} className="text-orange-600 hover:text-orange-700 font-medium text-sm">
-                  + Add Another Package
-                </button>
-              </div>
+                  ))}
+                  <button onClick={addPackage} className="text-orange-600 hover:text-orange-700 font-medium text-sm">
+                    + Add Another Package
+                  </button>
+                </div>
+              )}
+
+              {/* Persons Section */}
+              {isPersonsRequest && (
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Persons</label>
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 space-y-4`}>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Adults</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.persons.adults}
+                          onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, adults: parseInt(e.target.value) || 0 } })}
+                          className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white' : 'border-gray-300 bg-white'} rounded-lg`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Children</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.persons.children}
+                          onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, children: parseInt(e.target.value) || 0 } })}
+                          className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white' : 'border-gray-300 bg-white'} rounded-lg`}
+                        />
+                      </div>
+                    </div>
+
+                    <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.persons.carSeatRequested}
+                        onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, carSeatRequested: e.target.checked } })}
+                        className="rounded"
+                      />
+                      Car seat requested
+                    </label>
+
+                    <div>
+                      <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.persons.luggage.hasLuggage}
+                          onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, luggage: { ...formData.persons.luggage, hasLuggage: e.target.checked } } })}
+                          className="rounded"
+                        />
+                        Luggage
+                      </label>
+                      {formData.persons.luggage.hasLuggage && (
+                        <div className="ml-6 space-y-2">
+                          <input
+                            type="text"
+                            value={formData.persons.luggage.dimensions}
+                            onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, luggage: { ...formData.persons.luggage, dimensions: e.target.value } } })}
+                            placeholder="Approximate dimensions (e.g., 24x16x10 inches)"
+                            className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
+                          />
+                          <input
+                            type="text"
+                            value={formData.persons.luggage.weight}
+                            onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, luggage: { ...formData.persons.luggage, weight: e.target.value } } })}
+                            placeholder="Approximate weight (e.g., 50 lbs)"
+                            className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Time Window</label>
