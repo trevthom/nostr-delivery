@@ -223,6 +223,7 @@ export default function DeliveryApp() {
   // Refs
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const errorBannerRef = useRef<HTMLDivElement>(null);
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
@@ -539,7 +540,14 @@ export default function DeliveryApp() {
         const totalCost = estimateTotalCost(requestedAmount);
         const hasBalance = await hasSufficientBalance(nwc, totalCost);
         if (!hasBalance) {
-          setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+          const currentBalance = nwc.connectionState.balance !== undefined
+            ? formatSats(nwc.connectionState.balance)
+            : 'unknown';
+          setError(`Insufficient balance. Your current balance: ${currentBalance}. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+          // Scroll to error banner
+          setTimeout(() => {
+            errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
           return;
         }
       }
@@ -611,7 +619,10 @@ export default function DeliveryApp() {
           const totalCost = estimateTotalCost(bid.amount);
           const hasBalance = await hasSufficientBalance(nwc, totalCost);
           if (!hasBalance) {
-            setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
+            const currentBalance = nwc.connectionState.balance !== undefined
+              ? formatSats(nwc.connectionState.balance)
+              : 'unknown';
+            setError(`Insufficient balance. Your current balance: ${currentBalance}. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
             setLoading(false);
             return;
           }
@@ -1178,7 +1189,7 @@ export default function DeliveryApp() {
 
       {/* Error Banner */}
       {error && (
-        <div className="max-w-7xl mx-auto px-4 py-2">
+        <div ref={errorBannerRef} className="max-w-7xl mx-auto px-4 py-2">
           <div className={`${darkMode ? 'bg-red-900 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-3 flex items-center justify-between`}>
             <span className={`${darkMode ? 'text-red-200' : 'text-red-700'} text-sm`}>{error}</span>
             <button onClick={() => setError(null)} className={darkMode ? 'text-red-200' : 'text-red-700'}>âœ•</button>
@@ -2336,6 +2347,12 @@ export default function DeliveryApp() {
                 {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).map(delivery => {
                   const isCollapsed = collapsedDeliveries[delivery.id] !== false;
                   const completedDate = delivery.completed_at ? new Date(delivery.completed_at * 1000) : null;
+                  const courierBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+                  const courierNpub = courierBid?.courier || userProfile.npub;
+                  const courierProfile = courierProfiles[courierNpub];
+                  const transporterDisplay = courierProfile?.display_name
+                    ? `${courierProfile.display_name} (${formatNpubForDisplay(courierNpub)})`
+                    : formatNpubForDisplay(courierNpub);
 
                   return (
                     <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
@@ -2356,8 +2373,8 @@ export default function DeliveryApp() {
                             <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
                           </div>
                           <div>
-                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Sender</p>
-                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm truncate`}>{delivery.sender}</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Transported By</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm truncate`}>{transporterDisplay}</p>
                           </div>
                           {completedDate && (
                             <>
@@ -2391,8 +2408,8 @@ export default function DeliveryApp() {
                               <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
                             </div>
                             <div>
-                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Sender</p>
-                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm font-mono truncate`}>{delivery.sender}</p>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Transported By</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm truncate`}>{transporterDisplay}</p>
                             </div>
                             {completedDate && (
                               <>
@@ -2459,15 +2476,15 @@ export default function DeliveryApp() {
                           )}
 
                           {/* Earnings and Rating Info */}
-                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg grid md:grid-cols-2 gap-4`}>
-                            <div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
                               <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Earnings</p>
                               <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
                                 {delivery.offer_amount.toLocaleString()} sats
                               </p>
                             </div>
                             {delivery.sender_rating && (
-                              <div>
+                              <div className={`p-3 ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'} rounded-lg`}>
                                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Your Rating</p>
                                 <p className="text-yellow-500 text-2xl">{'⭐'.repeat(Math.round(delivery.sender_rating))} <span className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>({delivery.sender_rating.toFixed(1)})</span></p>
                               </div>
