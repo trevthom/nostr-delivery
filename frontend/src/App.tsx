@@ -1167,7 +1167,7 @@ export default function DeliveryApp() {
                 {deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id) && !seenCompletedDeliveries.has(r.id)).length > 0 && (
                   <div className={`flex items-center gap-2 px-4 py-2 ml-2 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'} rounded-full text-sm`}>
                     <Bell className="w-4 h-4" />
-                    <span>Delivery Completed!</span>
+                    <span>Transport Completed!</span>
                   </div>
                 )}
               </>
@@ -1720,7 +1720,7 @@ export default function DeliveryApp() {
         {currentView === 'active' && (
           <div>
             <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}` }>
-              {userMode === UserMode.SENDER ? 'My Requests' : 'Active Deliveries'}
+              {userMode === UserMode.SENDER ? 'My Requests' : 'Active Transports'}
             </h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
@@ -1955,7 +1955,7 @@ export default function DeliveryApp() {
               <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Active Delivery
+                    Active Transport
                     {activeDelivery.status === 'accepted' && !seenActiveDeliveries[activeDelivery.id] && (
                       <span className="text-red-500 ml-1">*</span>
                     )}
@@ -1966,7 +1966,7 @@ export default function DeliveryApp() {
                         onClick={() => markActiveDeliveryAsSeen(activeDelivery.id)}
                         className={`px-3 py-1 text-sm font-medium rounded-lg ${darkMode ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}
                       >
-                        Mark Active Delivery as Seen
+                        Mark Active Transport as Seen
                       </button>
                     )}
                     <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium`}>
@@ -2151,7 +2151,7 @@ export default function DeliveryApp() {
             ) : (
               <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <AlertCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No active deliveries. Browse available jobs to start earning!</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No active transports. Browse available jobs to start earning!</p>
               </div>
             )}
           </div>
@@ -2181,12 +2181,7 @@ export default function DeliveryApp() {
                     <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsedDeliveries(prev => ({ ...prev, [delivery.id]: !isCollapsed }))}>
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                            ✅ Completed
-                          </span>
-                          {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                        </div>
+                        {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                       </div>
 
                       {/* Collapsed Summary View */}
@@ -2334,7 +2329,7 @@ export default function DeliveryApp() {
             ) : deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length === 0 ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
                 <CheckCircle className={`w-16 h-16 ${darkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No completed deliveries yet.</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No completed transports yet.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -2345,13 +2340,8 @@ export default function DeliveryApp() {
                   return (
                     <div key={delivery.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsedDeliveries(prev => ({ ...prev, [delivery.id]: !isCollapsed }))}>
-                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Delivery</h3>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-4 py-2 ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'} rounded-full font-medium text-sm`}>
-                            ✅ Completed
-                          </span>
-                          {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                        </div>
+                        <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Transport</h3>
+                        {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                       </div>
 
                       {/* Collapsed Summary View */}
@@ -2364,6 +2354,10 @@ export default function DeliveryApp() {
                           <div>
                             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
                             <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
+                          </div>
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Sender</p>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm truncate`}>{delivery.sender}</p>
                           </div>
                           {completedDate && (
                             <>
@@ -2396,6 +2390,10 @@ export default function DeliveryApp() {
                               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff</p>
                               <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.dropoff.address}</p>
                             </div>
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Sender</p>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'} text-sm font-mono truncate`}>{delivery.sender}</p>
+                            </div>
                             {completedDate && (
                               <>
                                 <div>
@@ -2409,14 +2407,6 @@ export default function DeliveryApp() {
                               </>
                             )}
                           </div>
-
-                          {/* Star Rating */}
-                          {delivery.sender_rating && (
-                            <div className={`mb-4 p-3 ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'} rounded-lg`}>
-                              <h4 className={`font-semibold mb-2 ${darkMode ? 'text-yellow-300' : 'text-yellow-900'}`}>Your Rating</h4>
-                              <p className="text-yellow-500 text-2xl">{'⭐'.repeat(Math.round(delivery.sender_rating))} <span className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>({delivery.sender_rating.toFixed(1)} stars)</span></p>
-                            </div>
-                          )}
 
                     {/* Package Info */}
                     <div className="mb-4">
@@ -2468,12 +2458,20 @@ export default function DeliveryApp() {
                             </div>
                           )}
 
-                          {/* Earnings Info */}
-                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
-                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Earnings</p>
-                            <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                              {delivery.offer_amount.toLocaleString()} sats
-                            </p>
+                          {/* Earnings and Rating Info */}
+                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg grid md:grid-cols-2 gap-4`}>
+                            <div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Earnings</p>
+                              <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                                {delivery.offer_amount.toLocaleString()} sats
+                              </p>
+                            </div>
+                            {delivery.sender_rating && (
+                              <div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Your Rating</p>
+                                <p className="text-yellow-500 text-2xl">{'⭐'.repeat(Math.round(delivery.sender_rating))} <span className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>({delivery.sender_rating.toFixed(1)})</span></p>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
