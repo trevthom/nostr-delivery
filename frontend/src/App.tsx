@@ -613,7 +613,7 @@ export default function DeliveryApp() {
       };
 
       await api.createDelivery(deliveryData);
-      alert('âœ… Delivery request created!');
+      alert('âœ… Request created!');
       resetForm();
       await loadDeliveryRequests();
       setCurrentView('active');
@@ -744,7 +744,7 @@ export default function DeliveryApp() {
       };
 
       await api.updateDelivery(editingDelivery.id, deliveryData);
-      alert('âœ… Delivery request updated!');
+      alert('âœ… Request updated!');
       setEditingDelivery(null);
       resetForm();
       await loadDeliveryRequests();
@@ -790,14 +790,14 @@ export default function DeliveryApp() {
   };
 
   const deleteDeliveryRequest = async (deliveryId: string) => {
-    if (!confirm('Are you sure you want to delete this delivery request?')) {
+    if (!confirm('Are you sure you want to delete this request?')) {
       return;
     }
 
     try {
       setLoading(true);
       await api.deleteDelivery(deliveryId);
-      alert('âœ… Delivery request deleted!');
+      alert('âœ… Request deleted!');
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -1110,6 +1110,7 @@ export default function DeliveryApp() {
                     }
                   }}
                   placeholder="nsec1..."
+                  spellCheck={false}
                   className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm`}
                 />
                 <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1366,6 +1367,7 @@ export default function DeliveryApp() {
                         value={nwcConnectionUri}
                         onChange={(e) => setNwcConnectionUri(e.target.value)}
                         placeholder="nostr+walletconnect://..."
+                        spellCheck={false}
                         className={`w-full px-3 py-2 border rounded-lg mb-3 ${darkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'}`}
                       />
                       <div className="flex gap-2">
@@ -1406,6 +1408,7 @@ export default function DeliveryApp() {
                   value={userProfile.display_name || ''}
                   onChange={(e) => setUserProfile({ ...userProfile, display_name: e.target.value })}
                   placeholder="Optional"
+                  spellCheck={false}
                   className={`w-full text-sm font-medium ${darkMode ? 'bg-purple-800 text-purple-300 placeholder-purple-500' : 'bg-white text-purple-600 placeholder-purple-400'} border ${darkMode ? 'border-purple-700' : 'border-purple-300'} rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 />
               </div>
@@ -1529,7 +1532,7 @@ export default function DeliveryApp() {
         {currentView === 'create' && userMode === UserMode.SENDER && (
           <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
             <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {editingDelivery ? 'Edit Delivery Request' : 'Create Delivery Request'}
+              {editingDelivery ? 'Edit Request' : 'Create Request'}
             </h2>
             
             {editingDelivery && (
@@ -1554,6 +1557,7 @@ export default function DeliveryApp() {
                   value={formData.pickupAddress}
                   onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
                   placeholder="123 Main St, City, State ZIP"
+                  spellCheck={false}
                   className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
                 />
                 <input
@@ -1561,6 +1565,7 @@ export default function DeliveryApp() {
                   value={formData.pickupInstructions}
                   onChange={(e) => setFormData({ ...formData, pickupInstructions: e.target.value })}
                   placeholder="Special instructions (optional)"
+                  spellCheck={false}
                   className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mt-2 focus:ring-2 focus:ring-orange-500`}
                 />
               </div>
@@ -1572,13 +1577,15 @@ export default function DeliveryApp() {
                   value={formData.dropoffAddress}
                   onChange={(e) => setFormData({ ...formData, dropoffAddress: e.target.value })}
                   placeholder="456 Oak Ave, City, State ZIP"
+                  spellCheck={false}
                   className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                 />
                 <input
                   type="text"
                   value={formData.dropoffInstructions}
                   onChange={(e) => setFormData({ ...formData, dropoffInstructions: e.target.value })}
-                  placeholder="Delivery instructions (optional)"
+                  placeholder="Dropoff instructions (optional)"
+                  spellCheck={false}
                   className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mt-2 focus:ring-2 focus:ring-orange-500`}
                 />
               </div>
@@ -1638,6 +1645,7 @@ export default function DeliveryApp() {
                       value={pkg.description}
                       onChange={(e) => updatePackage(index, { description: e.target.value })}
                       placeholder="Description"
+                      spellCheck={false}
                       className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mb-2`}
                     />
                     <div className="flex gap-4">
@@ -1723,6 +1731,7 @@ export default function DeliveryApp() {
                             value={formData.persons.luggage.dimensions}
                             onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, luggage: { ...formData.persons.luggage, dimensions: e.target.value } } })}
                             placeholder="Approximate dimensions (e.g., 24x16x10 inches)"
+                            spellCheck={false}
                             className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
                           />
                           <input
@@ -1730,6 +1739,7 @@ export default function DeliveryApp() {
                             value={formData.persons.luggage.weight}
                             onChange={(e) => setFormData({ ...formData, persons: { ...formData.persons, luggage: { ...formData.persons.luggage, weight: e.target.value } } })}
                             placeholder="Approximate weight (e.g., 50 lbs)"
+                            spellCheck={false}
                             className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg`}
                           />
                         </div>
@@ -1783,7 +1793,7 @@ export default function DeliveryApp() {
                 {loading ? 'â³ Creating...' : (
                   <>
                     <Package className="w-5 h-5" />
-                    {editingDelivery ? 'Update Delivery Request' : 'Create Delivery Request'}
+                    {editingDelivery ? 'Update Request' : 'Create Request'}
                   </>
                 )}
               </button>
@@ -1835,13 +1845,82 @@ export default function DeliveryApp() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {request.packages.map((pkg, idx) => (
-                      <span key={idx} className={`px-3 py-1 ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'} rounded-full text-sm`}>
-                        {pkg.size} {pkg.fragile && 'ðŸ"´'}
-                      </span>
-                    ))}
-                  </div>
+                  {/* Special Instructions */}
+                  {(request.pickup.instructions || request.dropoff.instructions) && (
+                    <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                      {request.pickup.instructions && (
+                        <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          <strong>Pickup Instructions:</strong> {request.pickup.instructions}
+                        </p>
+                      )}
+                      {request.dropoff.instructions && (
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          <strong>Dropoff Instructions:</strong> {request.dropoff.instructions}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Package Details */}
+                  {request.packages && request.packages.length > 0 && (
+                    <div className="mb-4">
+                      <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Package Details:</p>
+                      {request.packages.map((pkg, idx) => (
+                        <div key={idx} className={`mb-2 p-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded`}>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                              {pkg.size}
+                            </span>
+                            {pkg.fragile && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Fragile</span>
+                            )}
+                            {pkg.requires_signature && (
+                              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Signature Required</span>
+                            )}
+                            {pkg.weight && (
+                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                                {pkg.weight} lbs
+                              </span>
+                            )}
+                          </div>
+                          {pkg.description && (
+                            <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {pkg.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Persons Details */}
+                  {(request as any).persons && ((request as any).persons.adults > 0 || (request as any).persons.children > 0) && (
+                    <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                      <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Passengers:</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {(request as any).persons.adults > 0 && (
+                          <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                            {(request as any).persons.adults} Adult{(request as any).persons.adults !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {(request as any).persons.children > 0 && (
+                          <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                            {(request as any).persons.children} Child{(request as any).persons.children !== 1 ? 'ren' : ''}
+                          </span>
+                        )}
+                        {(request as any).persons.carSeatRequested && (
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">Car Seat Needed</span>
+                        )}
+                      </div>
+                      {(request as any).persons.luggage?.hasLuggage && (
+                        <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          <strong>Luggage:</strong>
+                          {(request as any).persons.luggage.dimensions && <span> {(request as any).persons.luggage.dimensions}</span>}
+                          {(request as any).persons.luggage.weight && <span>, {(request as any).persons.luggage.weight}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     {(() => {
@@ -1913,7 +1992,7 @@ export default function DeliveryApp() {
                     <div key={request.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}` }>
-                          Delivery Request
+                          Request
                           {request.bids.length > 0 && request.status === 'open' && !seenBids[request.id] && (
                             <span className="text-red-500 ml-1">*</span>
                           )}
@@ -1972,6 +2051,83 @@ export default function DeliveryApp() {
                           <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
                         </div>
                       </div>
+
+                      {/* Special Instructions */}
+                      {(request.pickup.instructions || request.dropoff.instructions) && (
+                        <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                          {request.pickup.instructions && (
+                            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <strong>Pickup Instructions:</strong> {request.pickup.instructions}
+                            </p>
+                          )}
+                          {request.dropoff.instructions && (
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <strong>Dropoff Instructions:</strong> {request.dropoff.instructions}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Package Details */}
+                      {request.packages && request.packages.length > 0 && (
+                        <div className="mb-4">
+                          <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Package Details:</p>
+                          {request.packages.map((pkg, idx) => (
+                            <div key={idx} className={`mb-2 p-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded`}>
+                              <div className="flex flex-wrap gap-2">
+                                <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                                  {pkg.size}
+                                </span>
+                                {pkg.fragile && (
+                                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Fragile</span>
+                                )}
+                                {pkg.requires_signature && (
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Signature Required</span>
+                                )}
+                                {pkg.weight && (
+                                  <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                                    {pkg.weight} lbs
+                                  </span>
+                                )}
+                              </div>
+                              {pkg.description && (
+                                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {pkg.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Persons Details */}
+                      {(request as any).persons && ((request as any).persons.adults > 0 || (request as any).persons.children > 0) && (
+                        <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                          <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Passengers:</p>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {(request as any).persons.adults > 0 && (
+                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                                {(request as any).persons.adults} Adult{(request as any).persons.adults !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {(request as any).persons.children > 0 && (
+                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
+                                {(request as any).persons.children} Child{(request as any).persons.children !== 1 ? 'ren' : ''}
+                              </span>
+                            )}
+                            {(request as any).persons.carSeatRequested && (
+                              <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">Car Seat Needed</span>
+                            )}
+                          </div>
+                          {(request as any).persons.luggage?.hasLuggage && (
+                            <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <strong>Luggage:</strong>
+                              {(request as any).persons.luggage.dimensions && <span> {(request as any).persons.luggage.dimensions}</span>}
+                              {(request as any).persons.luggage.weight && <span>, {(request as any).persons.luggage.weight}</span>}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {request.status === 'open' && (
                         <div className="flex gap-2 mb-4">
@@ -2035,7 +2191,7 @@ export default function DeliveryApp() {
 
                       {request.status === 'completed' && (
                         <div className={`mt-4 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                          <h4 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Delivery Completed - Review & Confirm</h4>
+                          <h4 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Request Completed - Review & Confirm</h4>
 
                           {/* Show Proof of Delivery Images */}
                           {request.proof_of_delivery?.images && request.proof_of_delivery.images.length > 0 && (
@@ -2107,6 +2263,7 @@ export default function DeliveryApp() {
                               onChange={(e) => setSenderFeedback(e.target.value)}
                               placeholder="Share your experience with this delivery..."
                               rows={3}
+                              spellCheck={false}
                               className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                             />
                           </div>
@@ -2278,6 +2435,7 @@ export default function DeliveryApp() {
                             value={signatureName}
                             onChange={(e) => setSignatureName(e.target.value)}
                             placeholder="Enter name of person who signed"
+                            spellCheck={false}
                             className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                           />
                         </div>
@@ -2293,6 +2451,7 @@ export default function DeliveryApp() {
                           onChange={(e) => setDeliveryComments(e.target.value)}
                           placeholder="Add any notes or comments about the delivery..."
                           rows={3}
+                          spellCheck={false}
                           className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500`}
                         />
                       </div>
@@ -2408,15 +2567,28 @@ export default function DeliveryApp() {
                             )}
                           </div>
 
-                      {/* Package Info */}
-                      <div className="mb-4">
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Packages</p>
-                        <div className="flex flex-wrap gap-2">
-                          {delivery.packages.map((pkg, idx) => (
-                            <span key={idx} className={`px-3 py-1 ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'} rounded-full text-sm`}>
-                              {pkg.size} - {pkg.description || 'No description'}
+                      {/* Package Info and Payment Released - Side by Side */}
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        {/* Package Info */}
+                        <div>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Packages</p>
+                          <div className="flex flex-wrap gap-2">
+                            {delivery.packages.map((pkg, idx) => (
+                              <span key={idx} className={`px-3 py-1 ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'} rounded-full text-sm`}>
+                                {pkg.size} - {pkg.description || 'No description'}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Payment Released */}
+                        <div>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Payment Released</p>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`px-3 py-1 ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'} rounded-full text-sm font-bold`}>
+                              {delivery.offer_amount.toLocaleString()} sats
                             </span>
-                          ))}
+                          </div>
                         </div>
                       </div>
 
@@ -2474,14 +2646,6 @@ export default function DeliveryApp() {
                           </p>
                         </div>
                       )}
-
-                          {/* Payment Info */}
-                          <div className={`p-3 ${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg`}>
-                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Payment Released</p>
-                            <p className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                              {delivery.offer_amount.toLocaleString()} sats
-                            </p>
-                          </div>
                         </>
                       )}
                     </div>
