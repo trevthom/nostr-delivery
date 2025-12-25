@@ -366,10 +366,10 @@ export default function DeliveryApp() {
       const response = await fetch(`${API_URL}/health`);
       if (response.ok) {
         setBackendConnected(true);
-        console.log('âœ… Backend connected');
+        console.log('Backend connected');
       }
     } catch (error) {
-      console.error('âŒ Backend connection failed:', error);
+      console.error('Backend connection failed:', error);
       setBackendConnected(false);
     }
   };
@@ -418,7 +418,7 @@ export default function DeliveryApp() {
       setShowLogin(false);
       setNsecInput(''); // Clear the input for security
       
-      console.log('âœ… Logged in with nsec, npub:', npub);
+      console.log('Logged in with nsec, npub:', npub);
     } catch (err) {
       console.error('Nsec login error:', err);
       setError('Failed to login with nsec. Please check your private key.');
@@ -480,7 +480,7 @@ export default function DeliveryApp() {
       }
 
       setShowNwcInput(false);
-      console.log('âœ… Connected to NWC wallet');
+      console.log('Connected to NWC wallet');
     } catch (err) {
       console.error('NWC connection error:', err);
       setError('Failed to connect to NWC wallet. Please check your connection URI.');
@@ -613,7 +613,7 @@ export default function DeliveryApp() {
       };
 
       await api.createDelivery(deliveryData);
-      alert('âœ… Request created!');
+      alert('Request created!');
       resetForm();
       await loadDeliveryRequests();
       setCurrentView('active');
@@ -635,7 +635,7 @@ export default function DeliveryApp() {
         estimated_time: '1-2 hours',
         message: ''
       });
-      alert('âœ… Bid placed successfully!');
+      alert('Bid placed successfully!');
       await loadDeliveryRequests();
       
       // Switch to Active Deliveries view to see the accepted delivery
@@ -700,8 +700,8 @@ export default function DeliveryApp() {
       setSeenBids(prev => ({ ...prev, [request.id]: true }));
 
       const message = nwc.connectionState.status === NWCConnectionStatus.CONNECTED
-        ? 'âœ… Bid accepted and payment secured! Delivery in progress.'
-        : 'âœ… Bid accepted! Delivery in progress.';
+        ? 'Bid accepted and payment secured! Delivery in progress.'
+        : 'Bid accepted! Delivery in progress.';
       alert(message);
 
       await loadDeliveryRequests();
@@ -744,7 +744,7 @@ export default function DeliveryApp() {
       };
 
       await api.updateDelivery(editingDelivery.id, deliveryData);
-      alert('âœ… Request updated!');
+      alert('Request updated!');
       setEditingDelivery(null);
       resetForm();
       await loadDeliveryRequests();
@@ -797,7 +797,7 @@ export default function DeliveryApp() {
     try {
       setLoading(true);
       await api.deleteDelivery(deliveryId);
-      alert('âœ… Request deleted!');
+      alert('Request deleted!');
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -832,7 +832,7 @@ export default function DeliveryApp() {
       // the forfeiture by updating the courier's total_earnings.
       console.log(`💰 Forfeited ${formatSats(confirmedAmount)} to courier (tracked in backend)`);
 
-      alert(`âš ï¸ Job cancelled.\n\nThe courier has been credited ${formatSats(confirmedAmount)} for the cancellation.`);
+      alert(`Job cancelled.\n\nThe courier has been credited ${formatSats(confirmedAmount)} for the cancellation.`);
       await loadDeliveryRequests();
       setError(null);
     } catch (err) {
@@ -886,8 +886,8 @@ export default function DeliveryApp() {
       await api.confirmDelivery(delivery.id, selectedRating, senderFeedback.trim() || undefined);
 
       const message = nwc.connectionState.status === NWCConnectionStatus.CONNECTED
-        ? 'âœ… Delivery confirmed and payment released!'
-        : 'âœ… Delivery confirmed! Payment released.';
+        ? 'Delivery confirmed and payment released!'
+        : 'Delivery confirmed! Payment released.';
       alert(message);
 
       setSenderFeedback('');
@@ -949,7 +949,7 @@ export default function DeliveryApp() {
 
       if (!response.ok) throw new Error('Failed to complete delivery');
 
-      alert('âœ… Delivery marked as completed! Awaiting sender confirmation.');
+      alert('Delivery marked as completed! Awaiting sender confirmation.');
       setProofImages([]);
       setSignatureName('');
       setDeliveryComments('');
@@ -1076,7 +1076,7 @@ export default function DeliveryApp() {
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <>â³ Connecting...</>
+                  <>Connecting...</>
                 ) : (
                   <>
                     <TrendingUp className="w-5 h-5" />
@@ -1087,7 +1087,7 @@ export default function DeliveryApp() {
 
               <div className={`mt-4 p-4 ${darkMode ? 'bg-blue-900 border-blue-700' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
-                  <strong>ðŸ'¡ Demo Mode:</strong> Test the application without real Nostr or Lightning integration.
+                  <strong>Demo Mode:</strong> Test the application without real Nostr or Lightning integration.
                 </p>
               </div>
             </div>
@@ -1124,7 +1124,7 @@ export default function DeliveryApp() {
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <>â³ Logging in...</>
+                  <>Logging in...</>
                 ) : (
                   <>
                     <Key className="w-5 h-5" />
@@ -1135,7 +1135,7 @@ export default function DeliveryApp() {
 
               <div className={`mt-4 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
                 <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
-                  <strong>âš ï¸ Security:</strong> Your nsec is only used to derive your npub and is not stored. For maximum security, use a Nostr extension instead.
+                  <strong>Security:</strong> Your nsec is only used to derive your npub and is not stored. For maximum security, use a Nostr extension instead.
                 </p>
               </div>
             </div>
@@ -1151,7 +1151,7 @@ export default function DeliveryApp() {
           {!backendConnected && (
             <div className={`mt-6 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
               <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
-                <strong>âš ï¸ Backend not connected.</strong> Make sure the backend server is running on http://localhost:8080
+                <strong>Backend not connected.</strong> Make sure the backend server is running on http://localhost:8080
               </p>
             </div>
           )}
@@ -1257,7 +1257,7 @@ export default function DeliveryApp() {
         <div ref={errorBannerRef} className="max-w-7xl mx-auto px-4 py-2">
           <div className={`${darkMode ? 'bg-red-900 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-3 flex items-center justify-between`}>
             <span className={`${darkMode ? 'text-red-200' : 'text-red-700'} text-sm`}>{error}</span>
-            <button onClick={() => setError(null)} className={darkMode ? 'text-red-200' : 'text-red-700'}>âœ•</button>
+            <button onClick={() => setError(null)} className={darkMode ? 'text-red-200' : 'text-red-700'}></button>
           </div>
         </div>
       )}
@@ -1644,7 +1644,7 @@ export default function DeliveryApp() {
                       type="text"
                       value={pkg.description}
                       onChange={(e) => updatePackage(index, { description: e.target.value })}
-                      placeholder="Description"
+                      placeholder="Description (optional)"
                       spellCheck={false}
                       className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-600 text-white placeholder-gray-400' : 'border-gray-300 bg-white'} rounded-lg mb-2`}
                     />
@@ -1790,7 +1790,7 @@ export default function DeliveryApp() {
                 disabled={loading}
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                {loading ? 'â³ Creating...' : (
+                {loading ? 'Creating...' : (
                   <>
                     <Package className="w-5 h-5" />
                     {editingDelivery ? 'Update Request' : 'Create Request'}
@@ -1804,10 +1804,10 @@ export default function DeliveryApp() {
         {/* BROWSE JOBS VIEW */}
         {currentView === 'browse' && userMode === UserMode.COURIER && (
           <div className="space-y-4">
-            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Available Delivery Jobs</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Available Transport Jobs</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading deliveries...</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Loading available jobs...</p>
               </div>
             ) : deliveryRequests.filter(r => r.status === 'open').length === 0 ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
@@ -1977,7 +1977,7 @@ export default function DeliveryApp() {
             </h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Loading...</p>
               </div>
             ) : userMode === UserMode.SENDER ? (
               // Show sender's requests with bids (excluding only confirmed, keep completed for review)
@@ -2029,10 +2029,10 @@ export default function DeliveryApp() {
                             return (
                               <div className={`mb-4 p-3 ${daysLeft < 2 ? (darkMode ? 'bg-red-900 border-red-700' : 'bg-red-50 border-red-200') : (darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200')} border rounded-lg`}>
                                 <p className={`text-sm font-medium ${daysLeft < 2 ? (darkMode ? 'text-red-200' : 'text-red-700') : (darkMode ? 'text-yellow-200' : 'text-yellow-700')}`}>
-                                  âš  Auto-delete in {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`}
+                                  Auto-delete in {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`}
                                 </p>
                                 <p className={`text-xs mt-1 ${daysLeft < 2 ? (darkMode ? 'text-red-300' : 'text-red-600') : (darkMode ? 'text-yellow-300' : 'text-yellow-600')}`}>
-                                  This delivery will be automatically deleted if not started. Save details if you need to resubmit.
+                                  This request will be automatically deleted if not started. Save details if you need to resubmit.
                                 </p>
                               </div>
                             );
@@ -2167,7 +2167,7 @@ export default function DeliveryApp() {
                                 <div>
                                   <p className="font-medium">{bid.amount.toLocaleString()} sats</p>
                                   <p className="text-sm text-gray-500">
-                                    {bid.reputation.toFixed(1)}â­ â€¢ {bid.completed_deliveries} deliveries
+                                    {bid.reputation.toFixed(1)} {bid.completed_deliveries} deliveries
                                   </p>
                                 </div>
                                 <button
@@ -2417,7 +2417,6 @@ export default function DeliveryApp() {
                                 onClick={() => setProofImages(prev => prev.filter((_, i) => i !== idx))}
                                 className={`absolute top-1 right-1 ${darkMode ? 'bg-red-900 text-red-200' : 'bg-red-500 text-white'} rounded-full w-6 h-6 flex items-center justify-center text-xs`}
                               >
-                                âœ•
                               </button>
                             </div>
                           ))}
@@ -2496,7 +2495,7 @@ export default function DeliveryApp() {
             <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Requests</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Loading...</p>
               </div>
             ) : deliveryRequests.filter(r => r.sender === userProfile.npub && r.status === 'confirmed').length === 0 ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
@@ -2662,7 +2661,7 @@ export default function DeliveryApp() {
             <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Completed Transports</h2>
             {loading ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
-                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>â³ Loading...</p>
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Loading...</p>
               </div>
             ) : deliveryRequests.filter(r => r.status === 'confirmed' && r.bids.some(b => b.courier === userProfile.npub && r.accepted_bid === b.id)).length === 0 ? (
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
