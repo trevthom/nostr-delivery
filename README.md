@@ -49,7 +49,7 @@ You can add more relays for improved redundancy and availability.
 
 ✔ Enable "Deliveries Completed" increment in Settings menu
 
-☐ Enable optional name/identifier in addition to npub
+✔ Enable optional name/identifier in addition to npub
 
 ☐ Sending/Delivering address autocomplete?
 
