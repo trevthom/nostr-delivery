@@ -43,8 +43,6 @@ You can add more relays for improved redundancy and availability.
 
 ✔ Disable 10 second refresh (moves screen)
 
-☐ Demo Mode should be a read-only view
-
 ☐ Add unique identifiers to deliveries
 
 ✔ Enable Reputation Score

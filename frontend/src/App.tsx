@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, MapPin, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, LogOut, TrendingUp, Key, ChevronDown, ChevronUp, Bell, Wallet, Zap } from 'lucide-react';
+import { Package, MapPin, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, LogOut, Key, ChevronDown, ChevronUp, Bell, Wallet, Zap } from 'lucide-react';
 import { isValidNsec, nsecToNpub, formatNpubForDisplay } from './lib/crypto';
 import { useNWC } from './hooks/useNWC';
 import { NWCConnectionStatus } from './types/nwc';
@@ -204,7 +204,6 @@ const api = {
 export default function DeliveryApp() {
   // Auth & User State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authType, setAuthType] = useState<'demo' | 'nsec'>('demo'); // Track auth type
   const [userMode, setUserMode] = useState<UserMode>(UserMode.SENDER);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     npub: '',
@@ -237,7 +236,6 @@ export default function DeliveryApp() {
 
   // Login Form State
   const [nsecInput, setNsecInput] = useState('');
-  const [loginMode, setLoginMode] = useState<'demo' | 'nsec'>('demo');
 
   // Delivery Completion State
   const [proofImages, setProofImages] = useState<string[]>([]);
@@ -378,23 +376,6 @@ export default function DeliveryApp() {
   // AUTH HANDLERS
   // ============================================================================
 
-  const handleDemoLogin = async () => {
-    try {
-      setLoading(true);
-      const npub = `npub1demo${Math.random().toString(36).substring(7)}`;
-      const profile = await api.getUser(npub);
-      setUserProfile({ ...profile, npub });
-      setAuthType('demo');
-      setIsAuthenticated(true);
-      setShowLogin(false);
-      setError(null);
-    } catch (err) {
-      setError('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleNsecLogin = async () => {
     try {
       setLoading(true);
@@ -413,7 +394,6 @@ export default function DeliveryApp() {
       // Get or create user profile
       const profile = await api.getUser(npub);
       setUserProfile({ ...profile, npub, verified_identity: true });
-      setAuthType('nsec');
       setIsAuthenticated(true);
       setShowLogin(false);
       setNsecInput(''); // Clear the input for security
@@ -430,9 +410,7 @@ export default function DeliveryApp() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setShowLogin(true);
-    setAuthType('demo');
     setNsecInput('');
-    setLoginMode('demo');
     setUserProfile({
       npub: '',
       reputation: 4.5,
@@ -1070,103 +1048,51 @@ export default function DeliveryApp() {
             </div>
           )}
 
-          {/* Login Mode Tabs */}
-          <div className={`flex gap-2 mb-6 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
-            <button
-              disabled
-              className={`flex-1 px-4 py-3 font-medium cursor-not-allowed opacity-50 ${
-                loginMode === 'demo'
-                  ? 'border-b-2 border-gray-400 text-gray-500'
-                  : darkMode ? 'text-gray-400' : 'text-gray-500'
-              }`}
-            >
-              Demo Mode
-            </button>
-            <button
-              onClick={() => setLoginMode('nsec')}
-              className={`flex-1 px-4 py-3 font-medium transition-colors ${
-                loginMode === 'nsec'
-                  ? 'border-b-2 border-orange-500 text-orange-600'
-                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Nostr Login
-            </button>
-          </div>
-
-          {/* Demo Login */}
-          {loginMode === 'demo' && (
-            <div className="space-y-4">
-              <button
-                onClick={handleDemoLogin}
-                disabled={loading || !backendConnected}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>Connecting...</>
-                ) : (
-                  <>
-                    <TrendingUp className="w-5 h-5" />
-                    Start Demo
-                  </>
-                )}
-              </button>
-
-              <div className={`mt-4 p-4 ${darkMode ? 'bg-blue-900 border-blue-700' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
-                <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
-                  <strong>Demo Mode:</strong> Test the application without real Nostr or Lightning integration.
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Nsec Login */}
-          {loginMode === 'nsec' && (
-            <div className="space-y-4">
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
-                  Nostr Private Key (nsec)
-                </label>
-                <input
-                  type="password"
-                  value={nsecInput}
-                  onChange={(e) => setNsecInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !loading && backendConnected) {
-                      handleNsecLogin();
-                    }
-                  }}
-                  placeholder="nsec1..."
-                  spellCheck={false}
-                  className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm`}
-                />
-                <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Enter your Nostr private key (nsec1...) to login
-                </p>
-              </div>
-
-              <button
-                onClick={handleNsecLogin}
-                disabled={loading || !backendConnected || !nsecInput.trim()}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>Logging in...</>
-                ) : (
-                  <>
-                    <Key className="w-5 h-5" />
-                    Login with Nostr
-                  </>
-                )}
-              </button>
-
-              <div className={`mt-4 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
-                <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
-                  <strong>Security:</strong> Your nsec is only used to derive your npub and is not stored. For maximum security, use a Nostr extension instead.
-                </p>
-              </div>
+          <div className="space-y-4">
+            <div>
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Nostr Private Key (nsec)
+              </label>
+              <input
+                type="password"
+                value={nsecInput}
+                onChange={(e) => setNsecInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !loading && backendConnected) {
+                    handleNsecLogin();
+                  }
+                }}
+                placeholder="nsec1..."
+                spellCheck={false}
+                className={`w-full px-4 py-3 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm`}
+              />
+              <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Enter your Nostr private key (nsec1...) to login
+              </p>
             </div>
-          )}
+
+            <button
+              onClick={handleNsecLogin}
+              disabled={loading || !backendConnected || !nsecInput.trim()}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>Logging in...</>
+              ) : (
+                <>
+                  <Key className="w-5 h-5" />
+                  Login with Nostr
+                </>
+              )}
+            </button>
+
+            <div className={`mt-4 p-4 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
+              <p className={`text-sm ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>
+                <strong>Security:</strong> Your nsec is only used to derive your npub and is not stored. For maximum security, use a Nostr extension instead.
+              </p>
+            </div>
+          </div>
 
           <div className="mt-6 flex items-center justify-center gap-4 text-sm">
             <div className={`flex items-center gap-2 ${backendConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -1202,7 +1128,7 @@ export default function DeliveryApp() {
               <div>
                 <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nostr Delivery</h1>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {authType === 'nsec' ? (userProfile.display_name ? `${userProfile.display_name} (${userProfile.npub})` : userProfile.npub) : 'Demo Mode'}
+                  {userProfile.display_name ? `${userProfile.display_name} (${userProfile.npub})` : userProfile.npub}
                 </p>
               </div>
             </div>
@@ -1471,20 +1397,13 @@ export default function DeliveryApp() {
           {userMode === UserMode.SENDER && (
             <button
               onClick={() => {
-                if (authType === 'demo') {
-                  alert('Demo Mode is read-only. Please sign in with a private key to create requests.');
-                  return;
-                }
                 setCurrentView('create');
                 loadDeliveryRequests();
               }}
-              disabled={authType === 'demo'}
               className={`px-6 py-3 font-medium transition-colors ${
-                authType === 'demo'
-                  ? 'opacity-50 cursor-not-allowed text-gray-400'
-                  : currentView === 'create'
-                    ? 'border-b-2 border-orange-500 text-orange-600'
-                    : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                currentView === 'create'
+                  ? 'border-b-2 border-orange-500 text-orange-600'
+                  : darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Create Request
@@ -1947,13 +1866,9 @@ export default function DeliveryApp() {
                         <>
                           <button
                             onClick={() => {
-                              if (authType === 'demo') {
-                                alert('Demo Mode is read-only. Please sign in with a private key to accept delivery jobs.');
-                                return;
-                              }
                               !hasBid && placeBid(request.id, request.offer_amount);
                             }}
-                            disabled={loading || hasBid || authType === 'demo'}
+                            disabled={loading || hasBid}
                             className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
                           >
                             {hasBid
@@ -1963,14 +1878,10 @@ export default function DeliveryApp() {
                           </button>
                           <button
                             onClick={() => {
-                              if (authType === 'demo') {
-                                alert('Demo Mode is read-only. Please sign in with a private key to place bids.');
-                                return;
-                              }
                               const counterOffer = prompt('Enter your counter-offer (sats):');
                               if (counterOffer) placeBid(request.id, parseInt(counterOffer));
                             }}
-                            disabled={loading || authType === 'demo'}
+                            disabled={loading}
                             className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
                           >
                             Counter Offer
@@ -2171,13 +2082,9 @@ export default function DeliveryApp() {
                                 </div>
                                 <button
                                   onClick={() => {
-                                    if (authType === 'demo') {
-                                      alert('Demo Mode is read-only. Please sign in with a private key to accept bids.');
-                                      return;
-                                    }
                                     acceptBid(request, idx);
                                   }}
-                                  disabled={loading || authType === 'demo'}
+                                  disabled={loading}
                                   className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
                                 >
                                   Accept
