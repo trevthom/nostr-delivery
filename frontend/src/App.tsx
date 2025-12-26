@@ -560,9 +560,19 @@ export default function DeliveryApp() {
         // Skip balance validation for zero offer amounts
         if (requestedAmount > 0) {
           const totalCost = estimateTotalCost(requestedAmount);
-          const hasBalance = await hasSufficientBalance(nwc, totalCost);
-          if (!hasBalance) {
-            setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+          try {
+            const hasBalance = await hasSufficientBalance(nwc, totalCost);
+            if (!hasBalance) {
+              setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(requestedAmount)} + ~1% fees)`);
+              // Scroll to error banner
+              setTimeout(() => {
+                errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 100);
+              return;
+            }
+          } catch (balanceError) {
+            console.error('Failed to check wallet balance:', balanceError);
+            setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
             // Scroll to error banner
             setTimeout(() => {
               errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -644,17 +654,24 @@ export default function DeliveryApp() {
           // Skip balance validation for zero bid amounts
           if (bid.amount > 0) {
             const totalCost = estimateTotalCost(bid.amount);
-            const hasBalance = await hasSufficientBalance(nwc, totalCost);
-            if (!hasBalance) {
-              setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
+            try {
+              const hasBalance = await hasSufficientBalance(nwc, totalCost);
+              if (!hasBalance) {
+                setError(`Insufficient balance. You need at least ${formatSats(totalCost)} (${formatSats(bid.amount)} + ~1% fees)`);
+                setLoading(false);
+                return;
+              }
+            } catch (balanceError) {
+              console.error('Failed to check wallet balance:', balanceError);
+              setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
               setLoading(false);
               return;
             }
           }
 
-          // Create escrow invoice (courier creates invoice, sender pays it)
+          // Confirm bid acceptance with payment commitment
           const confirmation = window.confirm(
-            `Pay ${formatSats(bid.amount)} to escrow for this delivery?\n\nThe payment will be held in escrow and released to the courier upon delivery confirmation.`
+            `Accept this bid for ${formatSats(bid.amount)}?\n\nYou will pay ${formatSats(bid.amount)} to the courier when you confirm delivery completion.\n\nYour wallet balance: ${formatSats(Math.floor((nwc.connectionState.balance || 0) / 1000))} sats`
           );
 
           if (!confirmation) {
@@ -662,13 +679,7 @@ export default function DeliveryApp() {
             return;
           }
 
-          // In a real implementation, the courier would create the invoice
-          // For now, we'll simulate the escrow payment flow
-          console.log('💰 Processing escrow payment via NWC...');
-
-          // Note: In production, you'd get the courier's invoice and pay it
-          // For demo purposes, we're just logging the intent
-          console.log(`Would pay ${formatSats(bid.amount)} to escrow`);
+          console.log(`✅ Bid accepted. Payment of ${formatSats(bid.amount)} will be released upon delivery confirmation.`);
         } catch (paymentErr) {
           console.error('Payment error:', paymentErr);
           setError('Payment failed. Please check your wallet and try again.');
@@ -683,7 +694,7 @@ export default function DeliveryApp() {
       setSeenBids(prev => ({ ...prev, [request.id]: true }));
 
       const message = nwc.connectionState.status === NWCConnectionStatus.CONNECTED
-        ? 'Bid accepted and payment secured! Delivery in progress.'
+        ? `Bid accepted! Delivery in progress.\n\nYou'll pay ${formatSats(bid.amount)} to the courier when you confirm delivery completion.`
         : 'Bid accepted! Delivery in progress.';
       alert(message);
 
@@ -860,28 +871,48 @@ export default function DeliveryApp() {
       // If NWC is connected, handle payment release
       if (nwc.connectionState.status === NWCConnectionStatus.CONNECTED) {
         const acceptedBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
-        if (acceptedBid) {
-          const confirmation = window.confirm(
-            `Release payment of ${formatSats(acceptedBid.amount)} to the courier?\n\nThis confirms the delivery was completed successfully.`
+        if (acceptedBid && acceptedBid.amount > 0) {
+          // Get courier's profile for payment info
+          const courierNpub = acceptedBid.courier;
+          let courierInfo = '';
+          try {
+            const courierProfile = await api.getUser(courierNpub);
+            if (courierProfile.lightning_address) {
+              courierInfo = `\nCourier's Lightning Address: ${courierProfile.lightning_address}`;
+            }
+          } catch (err) {
+            console.error('Failed to fetch courier profile:', err);
+          }
+
+          // Prompt for courier's Lightning invoice
+          const courierInvoice = window.prompt(
+            `To release payment of ${formatSats(acceptedBid.amount)} to the courier, please enter their Lightning invoice.${courierInfo}\n\nThe courier should provide a Lightning invoice for ${formatSats(acceptedBid.amount)} sats.\n\nEnter Lightning invoice (starts with lnbc):`,
+            ''
           );
 
-          if (!confirmation) {
+          if (!courierInvoice) {
+            setLoading(false);
+            return;
+          }
+
+          // Validate invoice format
+          if (!courierInvoice.toLowerCase().startsWith('lnbc')) {
+            setError('Invalid Lightning invoice format. Invoice should start with "lnbc".');
             setLoading(false);
             return;
           }
 
           try {
-            // In production, the courier would provide their invoice
-            // For now, we'll simulate the payment release
             console.log('💸 Releasing payment via NWC...');
-            console.log(`Would pay ${formatSats(acceptedBid.amount)} to courier`);
 
-            // Note: In a real implementation, you'd:
-            // 1. Get the courier's invoice
-            // 2. Pay it using: await payInvoice(nwc, courierInvoice, delivery.id);
+            // Pay the courier's invoice
+            const { payInvoice } = await import('./lib/payments');
+            await payInvoice(nwc, courierInvoice.trim(), delivery.id);
+
+            console.log(`✅ Successfully paid ${formatSats(acceptedBid.amount)} to courier`);
           } catch (paymentErr) {
             console.error('Payment release error:', paymentErr);
-            setError('Failed to release payment. Please try again.');
+            setError(`Failed to release payment: ${paymentErr instanceof Error ? paymentErr.message : 'Unknown error'}. Please try again.`);
             setLoading(false);
             return;
           }
