@@ -164,18 +164,14 @@ export async function getWalletBalance(nwc: UseNWCReturn): Promise<number> {
 
 /**
  * Check if wallet has sufficient balance
+ * @throws Error if unable to check balance
  */
 export async function hasSufficientBalance(
   nwc: UseNWCReturn,
   requiredAmount: number // in sats
 ): Promise<boolean> {
-  try {
-    const balance = await getWalletBalance(nwc);
-    return balance >= requiredAmount;
-  } catch (error) {
-    console.error('Failed to check balance:', error);
-    return false;
-  }
+  const balance = await getWalletBalance(nwc);
+  return balance >= requiredAmount;
 }
 
 /**
