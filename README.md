@@ -12,13 +12,14 @@ This application uses **Nostr as the backend database**. Instead of a traditiona
 The Rust backend acts as a Nostr client that publishes and queries events from configured relays. The REST API remains unchanged, providing seamless integration with the frontend.
 
 ## To run, use two terminal windows:
-1. 1st terminal - navigate to backend folder
+1. Ensure Rust and Node.js are installed
+2. 1st terminal - navigate to backend folder
     - cargo run --release
-2. 2nd terminal - navigate to frontend folder
+3. 2nd terminal - navigate to frontend folder
     - npm install
     - npm run dev
-3. Open the link
-4. Login with nsec (nostrtool.com if you want a general one)
+4. Open the link
+5. Login with nsec (nostrtool.com if you want a general one)
 
 ## Configuration
 
@@ -43,8 +44,6 @@ You can add more relays for improved redundancy and availability.
 ✔ Disable 10 second refresh (moves screen)
 
 ☐ Demo Mode should be a read-only view
-
-☐ Even more compact "Completed Deliveries" view
 
 ☐ Add unique identifiers to deliveries
 
