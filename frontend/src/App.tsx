@@ -1199,7 +1199,10 @@ export default function DeliveryApp() {
 
             <button
               ref={settingsButtonRef}
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => {
+                setShowSettings(!showSettings);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className={`p-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
             >
               <Settings className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -1819,15 +1822,7 @@ export default function DeliveryApp() {
                 <div key={request.id} className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-6`}>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="w-5 h-5 text-orange-500" />
-                        <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</span>
-                      </div>
-                      <div className={`flex items-center gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                        <MapPin className="w-5 h-5" />
-                        <span>{request.dropoff.address}</span>
-                      </div>
-                      <div className={`flex items-center gap-4 mt-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <div className={`flex items-center gap-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           {request.time_window}
@@ -1845,49 +1840,49 @@ export default function DeliveryApp() {
                     </div>
                   </div>
 
-                  {/* Special Instructions */}
-                  {(request.pickup.instructions || request.dropoff.instructions) && (
+                  {/* Pickup Location */}
+                  <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
+                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
+                  </div>
+                  {request.pickup.instructions && (
                     <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                      {request.pickup.instructions && (
-                        <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          <strong>Pickup Instructions:</strong> {request.pickup.instructions}
-                        </p>
-                      )}
-                      {request.dropoff.instructions && (
-                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          <strong>Dropoff Instructions:</strong> {request.dropoff.instructions}
-                        </p>
-                      )}
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
+                    </div>
+                  )}
+
+                  {/* Dropoff Location */}
+                  <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
+                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
+                  </div>
+                  {request.dropoff.instructions && (
+                    <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
                     </div>
                   )}
 
                   {/* Package Details */}
                   {request.packages && request.packages.length > 0 && (
                     <div className="mb-4">
-                      <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Package Details:</p>
                       {request.packages.map((pkg, idx) => (
-                        <div key={idx} className={`mb-2 p-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded`}>
+                        <div key={idx} className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                          <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <strong>Package Size:</strong> {pkg.size}
+                          </p>
+                          {pkg.description && (
+                            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <strong>Package Description:</strong> {pkg.description}
+                            </p>
+                          )}
                           <div className="flex flex-wrap gap-2">
-                            <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                              {pkg.size}
-                            </span>
                             {pkg.fragile && (
                               <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Fragile</span>
                             )}
                             {pkg.requires_signature && (
                               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Signature Required</span>
                             )}
-                            {pkg.weight && (
-                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                                {pkg.weight} lbs
-                              </span>
-                            )}
                           </div>
-                          {pkg.description && (
-                            <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                              {pkg.description}
-                            </p>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -1896,24 +1891,16 @@ export default function DeliveryApp() {
                   {/* Persons Details */}
                   {(request as any).persons && ((request as any).persons.adults > 0 || (request as any).persons.children > 0) && (
                     <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                      <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Passengers:</p>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {(request as any).persons.adults > 0 && (
-                          <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                            {(request as any).persons.adults} Adult{(request as any).persons.adults !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                        {(request as any).persons.children > 0 && (
-                          <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                            {(request as any).persons.children} Child{(request as any).persons.children !== 1 ? 'ren' : ''}
-                          </span>
-                        )}
+                      <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <strong>Number of Adults:</strong> {(request as any).persons.adults}, <strong>Number of Children:</strong> {(request as any).persons.children}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                         {(request as any).persons.carSeatRequested && (
                           <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">Car Seat Needed</span>
                         )}
                       </div>
                       {(request as any).persons.luggage?.hasLuggage && (
-                        <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <div className={`text-sm mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                           <strong>Luggage:</strong>
                           {(request as any).persons.luggage.dimensions && <span> {(request as any).persons.luggage.dimensions}</span>}
                           {(request as any).persons.luggage.weight && <span>, {(request as any).persons.luggage.weight}</span>}
@@ -2041,60 +2028,49 @@ export default function DeliveryApp() {
                         })()
                       )}
 
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup</p>
-                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
-                        </div>
-                        <div>
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Dropoff</p>
-                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
-                        </div>
+                      {/* Pickup Location */}
+                      <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
+                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
                       </div>
-
-                      {/* Special Instructions */}
-                      {(request.pickup.instructions || request.dropoff.instructions) && (
+                      {request.pickup.instructions && (
                         <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                          {request.pickup.instructions && (
-                            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                              <strong>Pickup Instructions:</strong> {request.pickup.instructions}
-                            </p>
-                          )}
-                          {request.dropoff.instructions && (
-                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                              <strong>Dropoff Instructions:</strong> {request.dropoff.instructions}
-                            </p>
-                          )}
+                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
+                        </div>
+                      )}
+
+                      {/* Dropoff Location */}
+                      <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
+                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
+                      </div>
+                      {request.dropoff.instructions && (
+                        <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
                         </div>
                       )}
 
                       {/* Package Details */}
                       {request.packages && request.packages.length > 0 && (
                         <div className="mb-4">
-                          <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Package Details:</p>
                           {request.packages.map((pkg, idx) => (
-                            <div key={idx} className={`mb-2 p-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded`}>
+                            <div key={idx} className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                              <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                <strong>Package Size:</strong> {pkg.size}
+                              </p>
+                              {pkg.description && (
+                                <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  <strong>Package Description:</strong> {pkg.description}
+                                </p>
+                              )}
                               <div className="flex flex-wrap gap-2">
-                                <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                                  {pkg.size}
-                                </span>
                                 {pkg.fragile && (
                                   <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Fragile</span>
                                 )}
                                 {pkg.requires_signature && (
                                   <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Signature Required</span>
                                 )}
-                                {pkg.weight && (
-                                  <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                                    {pkg.weight} lbs
-                                  </span>
-                                )}
                               </div>
-                              {pkg.description && (
-                                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                  {pkg.description}
-                                </p>
-                              )}
                             </div>
                           ))}
                         </div>
@@ -2103,24 +2079,16 @@ export default function DeliveryApp() {
                       {/* Persons Details */}
                       {(request as any).persons && ((request as any).persons.adults > 0 || (request as any).persons.children > 0) && (
                         <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                          <p className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Passengers:</p>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {(request as any).persons.adults > 0 && (
-                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                                {(request as any).persons.adults} Adult{(request as any).persons.adults !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                            {(request as any).persons.children > 0 && (
-                              <span className={`px-2 py-1 ${darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-900'} rounded text-xs`}>
-                                {(request as any).persons.children} Child{(request as any).persons.children !== 1 ? 'ren' : ''}
-                              </span>
-                            )}
+                          <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <strong>Number of Adults:</strong> {(request as any).persons.adults}, <strong>Number of Children:</strong> {(request as any).persons.children}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
                             {(request as any).persons.carSeatRequested && (
                               <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">Car Seat Needed</span>
                             )}
                           </div>
                           {(request as any).persons.luggage?.hasLuggage && (
-                            <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <div className={`text-sm mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                               <strong>Luggage:</strong>
                               {(request as any).persons.luggage.dimensions && <span> {(request as any).persons.luggage.dimensions}</span>}
                               {(request as any).persons.luggage.weight && <span>, {(request as any).persons.luggage.weight}</span>}
