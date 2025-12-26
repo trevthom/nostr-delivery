@@ -153,6 +153,11 @@ export async function getWalletBalance(nwc: UseNWCReturn): Promise<number> {
     throw new Error('NWC wallet not connected');
   }
 
+  // Check if wallet supports get_balance
+  if (!nwc.connectionState.capabilities?.includes('get_balance')) {
+    throw new Error('Wallet does not support balance queries');
+  }
+
   try {
     const result = await nwc.getBalance();
     return Math.floor(result.balance / 1000); // Convert millisats to sats
@@ -164,14 +169,25 @@ export async function getWalletBalance(nwc: UseNWCReturn): Promise<number> {
 
 /**
  * Check if wallet has sufficient balance
- * @throws Error if unable to check balance
+ * Returns true if balance check is not supported (allow user to proceed)
  */
 export async function hasSufficientBalance(
   nwc: UseNWCReturn,
   requiredAmount: number // in sats
 ): Promise<boolean> {
-  const balance = await getWalletBalance(nwc);
-  return balance >= requiredAmount;
+  try {
+    const balance = await getWalletBalance(nwc);
+    return balance >= requiredAmount;
+  } catch (error) {
+    // If wallet doesn't support balance queries, return true to allow user to proceed
+    // The wallet will reject the payment if there's insufficient balance
+    if (error instanceof Error && error.message.includes('does not support balance queries')) {
+      console.warn('Wallet does not support balance queries - skipping balance check');
+      return true;
+    }
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 /**
