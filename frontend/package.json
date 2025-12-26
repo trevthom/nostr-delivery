@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@getalby/bitcoin-connect-react": "^3.11.5",
     "@noble/hashes": "^2.0.1",
     "@noble/secp256k1": "^2.0.0",
     "lucide-react": "^0.294.0",

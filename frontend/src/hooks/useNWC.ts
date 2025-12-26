@@ -295,7 +295,7 @@ export function useNWC(): UseNWCReturn {
           // Connect to relay
           const ws = new WebSocket(params.relay);
 
-          ws.onopen = () => {
+          ws.onopen = async () => {
             console.log('✅ Connected to NWC relay:', params.relay);
 
             // Subscribe to response and notification events from wallet
@@ -320,6 +320,74 @@ export function useNWC(): UseNWCReturn {
               walletPubkey: params.walletPubkey,
               relay: params.relay,
             });
+
+            // Fetch wallet capabilities after connection
+            try {
+              // Create a temporary getInfo function to fetch capabilities
+              const tempSendRequest = async <T = any>(method: NWCMethod, reqParams: Record<string, any>): Promise<T> => {
+                const { walletPubkey: wpk, secret: sec } = params;
+
+                const request: NWCRequest = {
+                  method,
+                  params: reqParams,
+                };
+
+                const content = JSON.stringify(request);
+                const encryptedContent = await encryptMessage(content, sec, wpk);
+
+                const clientPubkey = secp256k1.getPublicKey(sec, true);
+                const clientPubkeyHex = Array.from(clientPubkey.slice(1))
+                  .map(b => b.toString(16).padStart(2, '0'))
+                  .join('');
+
+                const created_at = Math.floor(Date.now() / 1000);
+                const tags: string[][] = [['p', wpk]];
+                const kind = NWCEventKind.REQUEST;
+
+                const id = await generateEventId(clientPubkeyHex, created_at, kind, tags, encryptedContent);
+
+                const sig = await secp256k1.sign(id, sec);
+                const sigBytes = typeof sig === 'string' ? hexToBytes(sig) : sig.toCompactRawBytes();
+                const sigHex = Array.from(sigBytes)
+                  .map(b => b.toString(16).padStart(2, '0'))
+                  .join('');
+
+                const event: NostrEvent = {
+                  id,
+                  kind,
+                  pubkey: clientPubkeyHex,
+                  created_at,
+                  tags,
+                  content: encryptedContent,
+                  sig: sigHex,
+                };
+
+                return new Promise((resolveFn, rejectFn) => {
+                  if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    rejectFn(new Error('WebSocket not connected'));
+                    return;
+                  }
+
+                  const timeout = setTimeout(() => {
+                    pendingRequestsRef.current.delete(id);
+                    rejectFn(new Error('Request timeout'));
+                  }, 10000); // 10 second timeout for get_info
+
+                  pendingRequestsRef.current.set(id, { resolve: resolveFn, reject: rejectFn, timeout });
+                  ws.send(JSON.stringify(['EVENT', event]));
+                });
+              };
+
+              const infoResult = await tempSendRequest<GetInfoResult>('get_info', {});
+              setConnectionState(prev => ({
+                ...prev,
+                capabilities: infoResult.methods,
+              }));
+              console.log('✅ Fetched wallet capabilities:', infoResult.methods);
+            } catch (infoError) {
+              console.warn('Failed to fetch wallet capabilities:', infoError);
+              // Don't fail connection if get_info fails
+            }
 
             // Resolve the Promise after connection is established
             resolve();

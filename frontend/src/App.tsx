@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, MapPin, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, LogOut, Key, ChevronDown, ChevronUp, Bell, Wallet, Zap } from 'lucide-react';
+import { Package, Clock, Bitcoin, CheckCircle, AlertCircle, Settings, LogOut, Key, ChevronDown, ChevronUp, Bell, Wallet, Zap } from 'lucide-react';
 import { isValidNsec, nsecToNpub, formatNpubForDisplay } from './lib/crypto';
 import { useNWC } from './hooks/useNWC';
 import { NWCConnectionStatus } from './types/nwc';
@@ -572,12 +572,17 @@ export default function DeliveryApp() {
             }
           } catch (balanceError) {
             console.error('Failed to check wallet balance:', balanceError);
-            setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
-            // Scroll to error banner
-            setTimeout(() => {
-              errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
-            return;
+            // Only show error for actual failures, not unsupported features
+            if (balanceError instanceof Error && !balanceError.message.includes('does not support balance queries')) {
+              setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
+              // Scroll to error banner
+              setTimeout(() => {
+                errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 100);
+              return;
+            }
+            // If balance check is not supported, log warning but allow user to proceed
+            console.warn('Balance verification skipped - wallet does not support balance queries');
           }
         }
       }
@@ -663,9 +668,14 @@ export default function DeliveryApp() {
               }
             } catch (balanceError) {
               console.error('Failed to check wallet balance:', balanceError);
-              setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
-              setLoading(false);
-              return;
+              // Only show error for actual failures, not unsupported features
+              if (balanceError instanceof Error && !balanceError.message.includes('does not support balance queries')) {
+                setError('Unable to verify wallet balance. Please check your wallet connection and try again.');
+                setLoading(false);
+                return;
+              }
+              // If balance check is not supported, log warning but allow user to proceed
+              console.warn('Balance verification skipped - wallet does not support balance queries');
             }
           }
 
@@ -831,7 +841,8 @@ export default function DeliveryApp() {
       return;
     }
 
-    const confirmedAmount = delivery.agreed_amount || delivery.offer_amount;
+    const acceptedBid = delivery.bids.find(b => b.id === delivery.accepted_bid);
+    const confirmedAmount = acceptedBid?.amount || delivery.offer_amount;
 
     if (!confirm(`Are you sure you want to cancel this job?\n\nYou will forfeit ${formatSats(confirmedAmount)} to the courier.\n\nThis action cannot be undone.`)) {
       return;
