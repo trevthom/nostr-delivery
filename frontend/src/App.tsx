@@ -49,7 +49,7 @@ interface DeliveryRequest {
   insurance_amount?: number;
   time_window: string;
   expires_at?: number;
-  status: 'open' | 'accepted' | 'intransit' | 'completed' | 'confirmed' | 'disputed';
+  status: 'open' | 'accepted' | 'intransit' | 'completed' | 'confirmed' | 'disputed' | 'expired' | 'cancelled';
   bids: DeliveryBid[];
   accepted_bid?: string;
   created_at: number;
@@ -596,7 +596,7 @@ export default function DeliveryApp() {
 
       setLoading(true);
 
-      const deliveryData = {
+      const deliveryData: any = {
         sender: userProfile.npub,
         pickup: {
           address: pickupAddress,
@@ -611,6 +611,11 @@ export default function DeliveryApp() {
         insurance_amount: insuranceAmount ? parseInt(insuranceAmount) : undefined,
         time_window: timeWindow === 'custom' ? customDate : timeWindow
       };
+
+      // Include persons data if it's a persons request
+      if (isPersonsRequest && (formData.persons.adults > 0 || formData.persons.children > 0)) {
+        deliveryData.persons = formData.persons;
+      }
 
       await api.createDelivery(deliveryData);
       alert('Request created!');
@@ -728,7 +733,7 @@ export default function DeliveryApp() {
 
       setLoading(true);
 
-      const deliveryData = {
+      const deliveryData: any = {
         pickup: {
           address: pickupAddress,
           instructions: formData.pickupInstructions || undefined
@@ -742,6 +747,11 @@ export default function DeliveryApp() {
         insurance_amount: insuranceAmount ? parseInt(insuranceAmount) : undefined,
         time_window: timeWindow === 'custom' ? customDate : timeWindow
       };
+
+      // Include persons data if it's a persons request
+      if (isPersonsRequest && (formData.persons.adults > 0 || formData.persons.children > 0)) {
+        deliveryData.persons = formData.persons;
+      }
 
       await api.updateDelivery(editingDelivery.id, deliveryData);
       alert('Request updated!');
@@ -760,13 +770,17 @@ export default function DeliveryApp() {
 
   const startEditingDelivery = (delivery: DeliveryRequest) => {
     setEditingDelivery(delivery);
+
+    // Check if delivery has persons data
+    const deliveryPersons = (delivery as any).persons;
+
     setFormData({
       pickupAddress: delivery.pickup.address,
       pickupInstructions: delivery.pickup.instructions || '',
       dropoffAddress: delivery.dropoff.address,
       dropoffInstructions: delivery.dropoff.instructions || '',
       packages: delivery.packages,
-      persons: {
+      persons: deliveryPersons || {
         adults: 1,
         children: 0,
         carSeatRequested: false,
@@ -781,6 +795,11 @@ export default function DeliveryApp() {
       timeWindow: delivery.time_window,
       customDate: ''
     });
+
+    // Set the appropriate request type checkboxes
+    setIsPackagesRequest(delivery.packages && delivery.packages.length > 0);
+    setIsPersonsRequest(!!deliveryPersons && (deliveryPersons.adults > 0 || deliveryPersons.children > 0));
+
     setCurrentView('create');
   };
 
@@ -800,8 +819,16 @@ export default function DeliveryApp() {
       alert('Request deleted!');
       await loadDeliveryRequests();
       setError(null);
-    } catch (err) {
-      setError('Failed to delete request');
+    } catch (err: any) {
+      // Refresh data in case the request status changed
+      await loadDeliveryRequests();
+
+      // Check if it's a 400 error indicating the request is no longer open
+      if (err.message === 'Failed to delete delivery') {
+        setError('Cannot delete this request. It may have already been accepted, expired, or deleted.');
+      } else {
+        setError('Failed to delete request');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -1841,26 +1868,28 @@ export default function DeliveryApp() {
                   </div>
 
                   {/* Pickup Location */}
-                  <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
+                  <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                    <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
+                    <p className={`${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>{request.pickup.address}</p>
+                    {request.pickup.instructions && (
+                      <>
+                        <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1 mt-3`}>Special Instructions:</p>
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
+                      </>
+                    )}
                   </div>
-                  {request.pickup.instructions && (
-                    <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
-                    </div>
-                  )}
 
                   {/* Dropoff Location */}
-                  <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
+                  <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                    <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
+                    <p className={`${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>{request.dropoff.address}</p>
+                    {request.dropoff.instructions && (
+                      <>
+                        <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1 mt-3`}>Special Instructions:</p>
+                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
+                      </>
+                    )}
                   </div>
-                  {request.dropoff.instructions && (
-                    <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
-                    </div>
-                  )}
 
                   {/* Package Details */}
                   {request.packages && request.packages.length > 0 && (
@@ -2029,26 +2058,28 @@ export default function DeliveryApp() {
                       )}
 
                       {/* Pickup Location */}
-                      <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.pickup.address}</p>
+                      <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                        <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Pickup Location</p>
+                        <p className={`${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>{request.pickup.address}</p>
+                        {request.pickup.instructions && (
+                          <>
+                            <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1 mt-3`}>Special Instructions:</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
+                          </>
+                        )}
                       </div>
-                      {request.pickup.instructions && (
-                        <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.pickup.instructions}</p>
-                        </div>
-                      )}
 
                       {/* Dropoff Location */}
-                      <div className={`mb-3 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{request.dropoff.address}</p>
+                      <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                        <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Dropoff Location</p>
+                        <p className={`${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>{request.dropoff.address}</p>
+                        {request.dropoff.instructions && (
+                          <>
+                            <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1 mt-3`}>Special Instructions:</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
+                          </>
+                        )}
                       </div>
-                      {request.dropoff.instructions && (
-                        <div className={`mb-4 p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{request.dropoff.instructions}</p>
-                        </div>
-                      )}
 
                       {/* Package Details */}
                       {request.packages && request.packages.length > 0 && (
